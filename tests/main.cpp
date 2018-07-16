@@ -7,7 +7,7 @@ void InitSylvan()
     using namespace sylvan;
     lace_init(1, 0);
     lace_startup(0, NULL, NULL);
-    sylvan_set_sizes(1LL<<23, 1LL<<26, 1LL<<23, 1LL<<26);
+    sylvan_set_sizes(1LL<<21, 1LL<<28, 1LL<<20, 1LL<<22);
     sylvan_init_package();
     sylvan_init_bdd();
 }
