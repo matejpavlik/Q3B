@@ -7,8 +7,6 @@
 #include <map>
 #include <functional>
 #include <unordered_map>
-#include "cudd.h"
-#include <cuddObj.hh>
 #include "../BDD/sylvan/bvec_sylvan.h"
 #include <z3++.h>
 #include "VariableOrderer.h"
@@ -29,7 +27,6 @@ using namespace sylvan;
 class ExprToBDDTransformer
 {
   private:
-    Cudd bddManager;
     static int varThreadOffset;
 
     std::map<std::string, Bvec> vars;
@@ -140,36 +137,36 @@ class ExprToBDDTransformer
 
     void configureReorder()
     {
-        if (config.reorderType != NO_REORDER)
-        {
-          switch (config.reorderType)
-          {
-              case WIN2:
-                  bddManager.AutodynEnable(CUDD_REORDER_WINDOW2);
-                  break;
-              case WIN2_ITE:
-                  bddManager.AutodynEnable(CUDD_REORDER_WINDOW2_CONV);
-                  break;
-              case WIN3:
-                  bddManager.AutodynEnable(CUDD_REORDER_WINDOW3);
-                  break;
-              case WIN3_ITE:
-                  bddManager.AutodynEnable(CUDD_REORDER_WINDOW3_CONV);
-                  break;
-              case SIFT:
-                  bddManager.SetMaxGrowth(1.05);
-                  bddManager.SetSiftMaxVar(1);
-                  bddManager.AutodynEnable(CUDD_REORDER_SYMM_SIFT);
-                  break;
-              case SIFT_ITE:
-                  bddManager.SetMaxGrowth(1.05);
-                  bddManager.SetSiftMaxVar(1);
-                  bddManager.AutodynEnable(CUDD_REORDER_SYMM_SIFT_CONV);
-                  break;
-              default:
-                  break;
-          }
-        }
+        // if (config.reorderType != NO_REORDER)
+        // {
+        //   switch (config.reorderType)
+        //   {
+        //       case WIN2:
+        //           bddManager.AutodynEnable(CUDD_REORDER_WINDOW2);
+        //           break;
+        //       case WIN2_ITE:
+        //           bddManager.AutodynEnable(CUDD_REORDER_WINDOW2_CONV);
+        //           break;
+        //       case WIN3:
+        //           bddManager.AutodynEnable(CUDD_REORDER_WINDOW3);
+        //           break;
+        //       case WIN3_ITE:
+        //           bddManager.AutodynEnable(CUDD_REORDER_WINDOW3_CONV);
+        //           break;
+        //       case SIFT:
+        //           bddManager.SetMaxGrowth(1.05);
+        //           bddManager.SetSiftMaxVar(1);
+        //           bddManager.AutodynEnable(CUDD_REORDER_SYMM_SIFT);
+        //           break;
+        //       case SIFT_ITE:
+        //           bddManager.SetMaxGrowth(1.05);
+        //           bddManager.SetSiftMaxVar(1);
+        //           bddManager.AutodynEnable(CUDD_REORDER_SYMM_SIFT_CONV);
+        //           break;
+        //       default:
+        //           break;
+        //   }
+        // }
     }
 
     void PrintModel(const std::map<std::string, std::vector<bool>>&);

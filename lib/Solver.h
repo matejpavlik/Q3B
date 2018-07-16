@@ -2,8 +2,6 @@
 #define BDDSOLVER_H
 
 #include <z3++.h>
-#include "cudd.h"
-#include <cuddObj.hh>
 #include "ExprToBDDTransformer.h"
 #include "Config.h"
 
