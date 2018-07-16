@@ -32,6 +32,7 @@ int main(int argc, char* argv[])
 	{"check-models", no_argument, 0, 'c' },
 	{"flip-universal", no_argument, 0, 'f' },
 	{"necessary-bits", no_argument, 0, 'b' },
+	{"worker-threads", required_argument, 0, 'w' },
 	{0,           0,                 0,  0   }
     };
 
@@ -42,9 +43,10 @@ int main(int argc, char* argv[])
     Config config;
 
     int opt = 0;
+    int workerThreads = 1;
 
     int long_index = 0;
-    while ((opt = getopt_long(argc, argv,"o:u:OUAr:ni:m:ldv:cfb", long_options, &long_index )) != -1) {
+    while ((opt = getopt_long(argc, argv,"o:u:OUAr:ni:m:ldv:cfbw:", long_options, &long_index )) != -1) {
 	switch (opt) {
 	case 'o':
 	    overApproximation = atoi(optarg);
@@ -75,6 +77,9 @@ int main(int argc, char* argv[])
 	    break;
 	case 'b':
 	    config.propagateNecessaryBits = true;
+	    break;
+	case 'w':
+	    workerThreads = atoi(optarg);
 	    break;
 	case 'r':
 	{
@@ -184,6 +189,13 @@ int main(int argc, char* argv[])
 	std::cout << "Filename required" << std::endl;
 	return 1;
     }
+
+    using namespace sylvan;
+    lace_init(workerThreads, 0);
+    lace_startup(0, NULL, NULL);
+    sylvan_set_sizes(1LL<<23, 1LL<<26, 1LL<<23, 1LL<<26);
+    sylvan_init_package();
+    sylvan_init_bdd();
 
     Solver solver(config);
     Result result;

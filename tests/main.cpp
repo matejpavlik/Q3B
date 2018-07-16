@@ -4,6 +4,7 @@
 
 Result SolveWithoutApprox(std::string filename)
 {
+    lace_init(1, 0);
     Config config;
     config.propagateUnconstrained = true;
     config.approximationMethod = VARIABLES;
@@ -19,6 +20,7 @@ Result SolveWithoutApprox(std::string filename)
 
 Result SolveWithVariableApprox(std::string filename, Approximation approx = NO_APPROXIMATION)
 {
+    lace_init(1, 0);
     Config config;
     config.propagateUnconstrained = true;
     config.approximationMethod = VARIABLES;
@@ -34,6 +36,7 @@ Result SolveWithVariableApprox(std::string filename, Approximation approx = NO_A
 
 Result SolveWithOperationsLimitApprox(std::string filename, Approximation approx = NO_APPROXIMATION, int precision = 0)
 {
+    lace_init(1, 0);
     Config config;
     config.propagateUnconstrained = true;
     config.approximationMethod = OPERATIONS;
@@ -50,6 +53,7 @@ Result SolveWithOperationsLimitApprox(std::string filename, Approximation approx
 
 Result SolveWithBothLimitApprox(std::string filename, Approximation approx = NO_APPROXIMATION, int precision = 0)
 {
+    lace_init(1, 0);
     Config config;
     config.propagateUnconstrained = true;
     config.approximationMethod = BOTH;

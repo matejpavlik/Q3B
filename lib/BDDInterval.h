@@ -1,25 +1,24 @@
 #pragma once
 
-#include "cudd.h"
-#include <cuddObj.hh>
+#include <sylvan_obj.hpp>
 
-using namespace cudd;
+using namespace sylvan;
 
 class BDDInterval
 {
 public:
-    BDD upper;
-    BDD lower;
+    Bdd upper;
+    Bdd lower;
 
     BDDInterval() = default;
     BDDInterval(const BDDInterval&) = default;
     BDDInterval& operator = (const BDDInterval&) = default;
 
-BDDInterval(BDD bdd) :
+BDDInterval(Bdd bdd) :
     upper(bdd), lower(bdd)
     { }
 
-BDDInterval(BDD upper, BDD lower) :
+BDDInterval(Bdd upper, Bdd lower) :
     upper(upper), lower(lower)
     { }
 
@@ -83,7 +82,7 @@ BDDInterval(BDD upper, BDD lower) :
 	return BDDInterval{upper.Ite(t.upper, e.upper), lower.Ite(t.lower, e.lower)};
     }
 
-    BDDInterval UnivAbstract(const BDD& variables)
+    BDDInterval UnivAbstract(const Bdd& variables)
     {
 	if (IsPrecise())
 	{
@@ -93,7 +92,7 @@ BDDInterval(BDD upper, BDD lower) :
 	return BDDInterval{upper.UnivAbstract(variables), lower.UnivAbstract(variables)};
     }
 
-    BDDInterval ExistAbstract(const BDD& variables)
+    BDDInterval ExistAbstract(const Bdd& variables)
     {
 	if (IsPrecise())
 	{

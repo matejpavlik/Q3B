@@ -50,8 +50,8 @@ Result Solver::getResult(z3::expr expr, Approximation approximation, int effecti
         }
     }
 
-    BDD returned = transformer.Proccess();
-    return returned.IsZero() ? UNSAT : SAT;
+    auto returned = transformer.Proccess();
+    return returned.isZero() ? UNSAT : SAT;
 }
 
 Result Solver::Solve(z3::expr expr, Approximation approximation, int effectiveBitWidth)
@@ -201,7 +201,7 @@ Result Solver::runOverApproximation(ExprToBDDTransformer &transformer, int bitWi
 
     auto returned = transformer.ProcessOverapproximation(bitWidth, precision);
 
-    auto result = returned.upper.IsZero() ? UNSAT : SAT;
+    auto result = returned.upper.isZero() ? UNSAT : SAT;
     if (result == UNSAT)
     {
 	Logger::Log("Solver", "Decided by overapproximation", 1);
@@ -215,7 +215,7 @@ Result Solver::runOverApproximation(ExprToBDDTransformer &transformer, int bitWi
 
     if (config.checkModels)
     {
-	auto model = transformer.GetModel(returned.lower.IsZero() ? returned.upper : returned.lower);
+	auto model = transformer.GetModel(returned.lower.isZero() ? returned.upper : returned.lower);
 
 	m_z3context.lock();
 	auto substituted = substituteModel(transformer.expression, model).simplify();
@@ -254,7 +254,7 @@ Result Solver::runUnderApproximation(ExprToBDDTransformer &transformer, int bitW
     Logger::Log("Underapproximating solver", ss.str(), 5);
 
     auto returned = transformer.ProcessUnderapproximation(bitWidth, precision);
-    auto result = returned.lower.IsZero() ? UNSAT : SAT;
+    auto result = returned.lower.isZero() ? UNSAT : SAT;
 
     if (result == SAT)
     {

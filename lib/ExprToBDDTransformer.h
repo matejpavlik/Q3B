@@ -9,7 +9,7 @@
 #include <unordered_map>
 #include "cudd.h"
 #include <cuddObj.hh>
-#include "../BDD/cudd/bvec_cudd.h"
+#include "../BDD/sylvan/bvec_sylvan.h"
 #include <z3++.h>
 #include "VariableOrderer.h"
 #include "Approximated.h"
@@ -24,15 +24,16 @@ enum Approximation { UNDERAPPROXIMATION, OVERAPPROXIMATION, NO_APPROXIMATION };
 
 typedef std::pair<std::string, BoundType> boundVar;
 
-using namespace cudd;
+using namespace sylvan;
 
 class ExprToBDDTransformer
 {
   private:
     Cudd bddManager;
+    static int varThreadOffset;
 
     std::map<std::string, Bvec> vars;
-    std::map<std::string, BDD> varSets;
+    std::map<std::string, Bdd> varSets;
     std::map<std::string, std::vector<int>> varIndices;
 
     std::set<var> constSet;
@@ -110,12 +111,12 @@ class ExprToBDDTransformer
     ExprToBDDTransformer(z3::context& context, z3::expr e, Config config);
 
     z3::expr expression;
-    BDD Proccess();
+    Bdd Proccess();
 
     BDDInterval ProcessUnderapproximation(int, unsigned int);
     BDDInterval ProcessOverapproximation(int, unsigned int);
 
-    std::map<std::string, BDD> GetVarSets() { return varSets; }
+    std::map<std::string, Bdd> GetVarSets() { return varSets; }
 
     void setApproximationType(ApproximationType at)
     {
@@ -172,10 +173,10 @@ class ExprToBDDTransformer
     }
 
     void PrintModel(const std::map<std::string, std::vector<bool>>&);
-    std::map<std::string, std::vector<bool>> GetModel(BDD);
+    std::map<std::string, std::vector<bool>> GetModel(Bdd);
 
-    void PrintNecessaryValues(BDD);
-    void PrintNecessaryVarValues(BDD, const std::string&);
+    void PrintNecessaryValues(Bdd);
+    void PrintNecessaryVarValues(Bdd, const std::string&);
 };
 
 #endif

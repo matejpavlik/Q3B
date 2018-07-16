@@ -13,8 +13,8 @@ endif(NOT CMAKE_BUILD_TYPE)
 file(GLOB Q3B_SRC
     "lib/*.h"
     "lib/*.cpp"
-    "BDD/cudd/bvec_cudd.h"
-    "BDD/cudd/bvec_cudd.cpp"
+    "BDD/sylvan/bvec_sylvan.h"
+    "BDD/sylvan/bvec_sylvan.cpp"
     "BDD/maybeBdd/maybeBdd.h"
     "BDD/maybeBdd/maybeBdd.cpp"
 )
@@ -24,7 +24,6 @@ SET(BUILD_SHARED_LIBRARIES OFF)
 #SET(CMAKE_EXE_LINKER_FLAGS "-static")
 set(CMAKE_EXE_LINKER_FLAGS "-static-libgcc -static-libstdc++")
 
-#set( CMAKE_CXX_FLAGS "-fstack-protector -fstack-protector-all" )
 set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -Wall")
 set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -Wall")
 
@@ -37,12 +36,13 @@ endif(NOT LibZ3)
 include_directories(${LibZ3_INCLUDE_DIRS})
 set(LIBS ${LIBS} ${LibZ3})
 
-find_library(LibCUDD cudd PATHS /usr/local/lib DOC "bdd library")
-if(NOT LibCUDD)
-  message(FATAL_ERROR "Library libcudd required, but not found!")
-endif(NOT LibCUDD)
+find_library(LibSylvan cudd PATHS /usr/local/lib64 DOC "bdd library")
+if(NOT LibSylvan)
+  message(FATAL_ERROR "Library libsylvan required, but not found!")
+endif(NOT LibSylvan)
 
-set(LIBS ${LIBS} ${LibCUDD})
+set(LIBS ${LIBS} ${LibSylvan})
+LINK_LIBRARIES(/usr/local/lib64/libsylvan.a)
 
 find_package(OpenMP)
 if (OPENMP_FOUND)
@@ -97,7 +97,6 @@ add_custom_command(OUTPUT ${LIBFOO_TAR_HEADERS}
   COMMAND cp "${CMAKE_CURRENT_SOURCE_DIR}/app/starexec_run_default" bin
   COMMAND cp q3b bin
   COMMAND tar -czf q3b_starexec.tar.gz bin
-  COMMAND rm -rf bin
   OUTPUT q3b_starexec.tar.gz
   COMMENT "Generating starexec archive"
   VERBATIM
