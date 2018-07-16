@@ -33,7 +33,7 @@ class ExprToBDDTransformer
     static int varThreadOffset;
 
     std::map<std::string, Bvec> vars;
-    std::map<std::string, Bdd> varSets;
+    std::map<std::string, BddSet> varSets;
     std::map<std::string, std::vector<int>> varIndices;
 
     std::set<var> constSet;
@@ -116,7 +116,7 @@ class ExprToBDDTransformer
     BDDInterval ProcessUnderapproximation(int, unsigned int);
     BDDInterval ProcessOverapproximation(int, unsigned int);
 
-    std::map<std::string, Bdd> GetVarSets() { return varSets; }
+    std::map<std::string, BddSet> GetVarSets() { return varSets; }
 
     void setApproximationType(ApproximationType at)
     {

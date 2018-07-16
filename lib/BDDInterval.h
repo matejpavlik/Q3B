@@ -82,7 +82,7 @@ BDDInterval(Bdd upper, Bdd lower) :
 	return BDDInterval{upper.Ite(t.upper, e.upper), lower.Ite(t.lower, e.lower)};
     }
 
-    BDDInterval UnivAbstract(const Bdd& variables)
+    BDDInterval UnivAbstract(const BddSet& variables)
     {
 	if (IsPrecise())
 	{
@@ -92,7 +92,7 @@ BDDInterval(Bdd upper, Bdd lower) :
 	return BDDInterval{upper.UnivAbstract(variables), lower.UnivAbstract(variables)};
     }
 
-    BDDInterval ExistAbstract(const Bdd& variables)
+    BDDInterval ExistAbstract(const BddSet& variables)
     {
 	if (IsPrecise())
 	{

@@ -1183,21 +1183,8 @@ Approximated<Bvec> ExprToBDDTransformer::bvec_unOp(const z3::expr& e, const std:
 map<string, vector<bool>> ExprToBDDTransformer::GetModel(Bdd modelBdd)
 {
     std::map<std::string, std::vector<bool>> model;
-    std::vector<Bdd> modelVars;
 
-    for (const auto [name, bw] : constSet)
-    {
-	auto varBvec = vars.at(name);
-	for (int i = bw - 1; i >= 0; i--)
-	{
-	    if (varBvec[i].IsVar())
-	    {
-		modelVars.push_back(varBvec[i]);
-	    };
-	}
-    }
-
-    //modelBdd = modelBdd.PickOneMinterm(modelVars);
+    modelBdd = modelBdd.PickOneCube();
 
     for (const auto [name, bw] : constSet)
     {
