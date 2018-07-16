@@ -36,13 +36,12 @@ endif(NOT LibZ3)
 include_directories(${LibZ3_INCLUDE_DIRS})
 set(LIBS ${LIBS} ${LibZ3})
 
-find_library(LibSylvan cudd PATHS /usr/local/lib64 DOC "bdd library")
+find_library(LibSylvan sylvan DOC "bdd library")
 if(NOT LibSylvan)
   message(FATAL_ERROR "Library libsylvan required, but not found!")
 endif(NOT LibSylvan)
 
 set(LIBS ${LIBS} ${LibSylvan})
-LINK_LIBRARIES(/usr/local/lib64/libsylvan.a)
 
 find_package(OpenMP)
 if (OPENMP_FOUND)
