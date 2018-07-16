@@ -33,7 +33,7 @@ install:
   - mkdir build && cd build
   - cmake .. -DBUILD_STATIC_LIBS=ON -DBUILD_SHARED_LIBS=OFF && make -j8 && sudo make install
   - cd ..
-  - rm -rf build
+  - cd ..
 
 script:
   - mkdir build && cd build && cmake .. -DCOVERAGE=1
