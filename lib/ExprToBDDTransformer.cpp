@@ -870,18 +870,41 @@ Approximated<Bvec> ExprToBDDTransformer::getBvecFromExpr(const expr &e, const ve
 	{
 	    checkNumberOfArguments<3>(e);
 
-	    //TODO: Tohle může být nekorektní kvůli isPositive!!!
 	    auto arg0 = getBDDFromExpr(e.arg(0), boundVars, false, true);
+            auto arg1 = getBvecFromExpr(e.arg(1), boundVars).value;
+            auto arg2 = getBvecFromExpr(e.arg(2), boundVars).value;
+
 	    if (arg0.upper != arg0.lower)
 	    {
-		auto unknown = Bvec{bddManager,
-				    e.get_sort().bv_size(),
-				    MaybeBDD{}};
-		return insertIntoCaches(e, {unknown, APPROXIMATED, APPROXIMATED}, boundVars);
-	    }
+                auto resultBW = e.get_sort().bv_size();
+                auto result = Bvec::bvec_build(bddManager, resultBW, false);
 
-	    auto arg1 = getBvecFromExpr(e.arg(1), boundVars).value;
-	    auto arg2 = getBvecFromExpr(e.arg(2), boundVars).value;
+                for (size_t i = 0; i < resultBW; i++)
+                {
+                    if (!arg1[i].HasValue() || !arg2[i].HasValue())
+                    {
+                        result[i] = MaybeBDD{};
+                    }
+                    else if (arg1[i].GetBDD() == arg2[i].GetBDD())
+                    {
+                        result[i] = arg1[i];
+                    }
+                    else
+                    {
+                        auto thenElseDifferent = arg1[i].GetBDD().Xor(arg2[i].GetBDD());
+                        auto upperLowerDifferent = arg0.upper.Xor(arg0.lower);
+                        if ((upperLowerDifferent & thenElseDifferent) == bddManager.bddZero())
+                        {
+                            // the result for this bit is precise, because
+                            // there is no input for which the condition is imprecise
+                            // and the "then" and "else" branches differ
+                            result[i] = arg0.upper.Ite(arg1[i].GetBDD(), arg2[i].GetBDD());
+                        }
+                    }
+                }
+
+		return insertIntoCaches(e, {result, APPROXIMATED, APPROXIMATED}, boundVars);
+	    }
 
 	    auto maybeArg0 = MaybeBDD(arg0.upper);
 	    auto result = Bvec::bvec_ite(MaybeBDD{maybeArg0},

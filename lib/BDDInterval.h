@@ -69,7 +69,7 @@ BDDInterval(BDD upper, BDD lower) :
 	return BDDInterval{!upper, !lower};
     }
 
-    BDDInterval Xnor (const BDDInterval& rhs) const
+    BDDInterval Xnor(const BDDInterval& rhs) const
     {
         if (isInterrupted()) return *this;
 	if (IsPrecise() && rhs.IsPrecise())
@@ -80,7 +80,7 @@ BDDInterval(BDD upper, BDD lower) :
 	return BDDInterval{upper.Xnor(rhs.upper), lower.Xnor(rhs.lower)};
     }
 
-    BDDInterval Ite (const BDDInterval& t, const BDDInterval& e) const
+    BDDInterval Ite(const BDDInterval& t, const BDDInterval& e) const
     {
         if (isInterrupted()) return *this;
 	if (IsPrecise() && t.IsPrecise() && e.IsPrecise())
