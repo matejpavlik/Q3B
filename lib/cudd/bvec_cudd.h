@@ -5,6 +5,7 @@
 #include <fstream>
 #include <vector>
 #include <cuddObj>
+#include <iostream>
 
 namespace cudd {
 
