@@ -9,7 +9,7 @@ enum LogType
 {
     WARNING,
     INFO,
-    ERROR
+    ERROR_
 };
 
 class Logger

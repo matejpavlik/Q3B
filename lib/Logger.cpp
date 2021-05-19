@@ -1,6 +1,6 @@
 #include "Logger.h"
 
-int Logger::m_verbosityLevel = 0;
+int Logger::m_verbosityLevel = 5;
 std::mutex Logger::m;
 std::chrono::time_point<std::chrono::high_resolution_clock> Logger::startTime = std::chrono::high_resolution_clock::now();
 
@@ -12,7 +12,7 @@ std::string logTypeToStr(const LogType& type)
 	return "Warning";
     case LogType::INFO:
 	return "Info";
-    case LogType::ERROR:
+    case LogType::ERROR_:
 	return "Error";
     default:
 	abort();
