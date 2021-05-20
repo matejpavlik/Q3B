@@ -928,12 +928,12 @@ Bvec ExprToBDDTransformer::bvec_mul(Bvec &arg0, Bvec& arg1)
     Bvec result(bddManager);
     if (arg0.bitnum() <= 32 && arg1.bitnum() <= 32)
     {
-        if (arg1.bvec_isConst())
+        if (arg1.bvec_isPreciseConst())
         {
             swap(arg0,arg1);
         }
 
-        if (arg0.bvec_isConst())
+        if (arg0.bvec_isPreciseConst())
         {
             unsigned int val = arg0.bvec_val();
 
