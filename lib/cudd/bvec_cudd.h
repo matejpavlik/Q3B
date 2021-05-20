@@ -4,7 +4,7 @@
 #include <functional>
 #include <fstream>
 #include <vector>
-#include "../cuddCpp/cuddObj.hh"
+#include <cuddObj.hh>
 #include <iostream>
 
 namespace cudd {
