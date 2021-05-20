@@ -113,7 +113,7 @@ namespace cudd {
     }
 
     bool
-    Bvec::bvec_isConst() const {
+    Bvec::bvec_isPreciseConst() const {
         for (size_t i = 0U; i < bitnum(); ++i) {
             if (!(m_bitvec[i].IsOne() || m_bitvec[i].IsZero())) {
                 return false;
@@ -124,6 +124,9 @@ namespace cudd {
 
     unsigned int
     Bvec::bvec_varBits() const {
+        // TODO : CONSIDER REMOVING
+        // Note : It does not seem to do what the name says.
+        //        No use within Q3B, leaving unchanged.
 	unsigned int varBits = 0;
         for (size_t i = 0U; i < bitnum(); ++i) {
             if (m_bitvec[i].IsOne() || m_bitvec[i].IsZero()) {
@@ -153,7 +156,7 @@ namespace cudd {
     }
 
     Bvec
-    Bvec::bvec_map1(const Bvec& src, std::function<BDD(const BDD&)> fun) {
+    Bvec::bvec_map1(const Bvec& src, const std::function<BDD(const BDD&)>& fun) {
         Bvec res = reserve(*src.m_manager, src.bitnum());
         for (size_t i = 0; i < src.bitnum(); ++i) {
             res.m_bitvec.push_back(fun(src[i]));
@@ -162,7 +165,7 @@ namespace cudd {
     }
 
     Bvec
-    Bvec::bvec_map2(const Bvec& first, const Bvec& second, std::function<BDD(const BDD&, const BDD&)> fun) {
+    Bvec::bvec_map2(const Bvec& first, const Bvec& second, const std::function<BDD(const BDD&, const BDD&)>& fun) {
         Cudd& manager = check_same_cudd(*first.m_manager, *second.m_manager);
         Bvec res(manager);
 
@@ -209,7 +212,7 @@ namespace cudd {
             comp = (left[i] & right[i]) | (comp & (left[i] | right[i]));
         }
 
-        for (size_t i = (size_t)preciseBdds; i < left.bitnum(); i++)
+        for (size_t i = preciseBdds; i < left.bitnum(); i++)
         {
             res.m_bitvec.push_back(manager.bddUnknown());
         }

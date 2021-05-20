@@ -4,7 +4,7 @@
 #include <functional>
 #include <fstream>
 #include <vector>
-#include <cuddObj>
+#include "../cuddCpp/cuddObj.hh"
 #include <iostream>
 
 namespace cudd {
@@ -67,7 +67,7 @@ public:
     arithmetic_neg(const Bvec& src);
 
     bool
-    bvec_isConst() const;
+    bvec_isPreciseConst() const;
 
     unsigned int
     bvec_varBits() const;
@@ -79,10 +79,10 @@ public:
     bvec_copy(const Bvec& other);
 
     static Bvec
-    bvec_map1(const Bvec& src, std::function<BDD(const BDD&)> fun);
+    bvec_map1(const Bvec& src, const std::function<BDD(const BDD&)>& fun);
 
     static Bvec
-    bvec_map2(const Bvec& first, const Bvec& second, std::function<BDD(const BDD&, const BDD&)> fun);
+    bvec_map2(const Bvec& first, const Bvec& second, const std::function<BDD(const BDD&, const BDD&)>& fun);
 
     static Bvec
     bvec_add(const Bvec& left, const Bvec& right);
