@@ -8,7 +8,7 @@
 #include "HexHelper.h"
 #include "Solver.h"
 
-const unsigned int precisionMultiplier = 20;
+const unsigned int precisionMultiplier = 1000;
 
 using namespace std;
 using namespace z3;
