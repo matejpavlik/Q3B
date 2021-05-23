@@ -94,7 +94,6 @@ Result Solver::Solve(z3::expr expr, Approximation approximation, int effectiveBi
         else if (approximation == UNDERAPPROXIMATION) approximation = OVERAPPROXIMATION;
     }
 
-    // TODO : ¿what's this?
     if (approximation == OVERAPPROXIMATION)
     {
         Logger::Log("Solver", "Introducing mul constants.", 1);
@@ -316,87 +315,6 @@ Result Solver::runUnderApproximation(ExprToBDDTransformer &transformer, int bitW
     return UNKNOWN;
 }
 
-// TODO : just backup
-/*
-Result Solver::runApproximation(ExprToBDDTransformer &transformer, int bitWidth, int precision) {
-    if (resultComputed) return UNKNOWN;
-    transformer.setApproximationType(SIGN_EXTEND);
-    // under approximation used
-    //  transformer.setApproximationType(ZERO_EXTEND);
-
-    std::stringstream ss;
-    ss << "Trying bit-width " << bitWidth << ", precision " << precision;
-    Logger::Log("Unknown-approximating solver", ss.str(), 5);
-
-    auto returned = transformer.ProcessApproximation(bitWidth, precision);
-
-    if (returned.IsZero()) {
-        Logger::Log("Solver", "Decided by unknown-approximation (over)", 1);
-        std::stringstream rss;
-        rss << "Final bit-width " << bitWidth << ", precision " << precision;
-        Logger::Log("Unknown-approximating solver", rss.str(), 1);
-        return UNSAT;
-    }
-
-    if (resultComputed) return UNKNOWN;
-
-    BDD lower = returned.ForgetZeros();
-    if (!lower.IsUnknown()) { // there's some [1]
-        Logger::Log("Solver", "Decided by unknown-approximation (under)", 1);
-        Logger::Log("Solver", "forget zeros is not unknown (there's some [1])", 5);
-        std::stringstream rss;
-        rss << "Final bit-width " << bitWidth << ", precision " << precision;
-        Logger::Log("Unknown-approximating solver", rss.str(), 1);
-
-        if (config.produceModels)
-        {
-            threadModel = transformer.GetModel(lower, UNDER_APPROX_BDD);
-        }
-
-        return SAT;
-    }
-
-    // result does not contain any [1] target
-    if (Solver::resultComputed) return UNKNOWN;
-
-    transformer.PrintNecessaryValues(returned);
-
-    // try to find an assignment leading to [?] and verify if it is a model
-    // originally -- try to find a model of the over-approximated BDD
-    if (config.checkModels) {
-        if (Solver::resultComputed) return UNKNOWN;
-        auto model = transformer.GetModel(returned, OVER_APPROX_BDD);
-
-        m_z3context.lock();
-        auto substituted = substituteModel(transformer.expression, model).simplify();
-        m_z3context.unlock();
-
-        if (substituted.hash() != transformer.expression.hash()) { // the possible model led to an actual simplification
-            Logger::Log("Unknown-approximating solver", "Validating model", 5);
-
-            Config validatingConfig;
-            validatingConfig.propagateUnconstrained = true;
-            validatingConfig.approximationMethod = config.approximationMethod;
-            validatingConfig.validatingSolver = true;
-
-            Solver validatingSolver(validatingConfig);
-
-            if (validatingSolver.Solve(substituted, UNKNOWN_APPROXIMATION, 1) == SAT) {
-                Logger::Log("Solver", "Decided by unknown-approximation (over)", 1);
-                std::stringstream rss;
-                rss << "Final bit-width " << bitWidth << ", precision " << precision;
-                Logger::Log("Unknown-approximating solver", rss.str(), 1);
-                if (config.produceModels) {
-                    threadModel = model;
-                }
-                return SAT;
-            }
-        }
-    }
-
-    return UNKNOWN;
-}
-*/
 
 Result Solver::runWithApproximations(ExprToBDDTransformer &transformer, Approximation approximation)
 {
@@ -516,103 +434,6 @@ Result Solver::runWithOverApproximations(ExprToBDDTransformer &transformer)
     return runWithApproximations(transformer, OVERAPPROXIMATION);
 }
 
-// TODO : just backup
-/*
-Result Solver::runWithApproximations(ExprToBDDTransformer &transformer, Approximation approximation) {
-    assert (approximation != NO_APPROXIMATION);
-
-    auto runFunction = [this, &approximation](auto &transformer, int bitWidth, unsigned int precision) {
-        return runApproximation(transformer, bitWidth, precision);
-    };
-
-    if (config.approximationMethod == BOTH) {
-        unsigned int prec = 1;
-        unsigned int lastBW = 1;
-        while (prec != 0 && !resultComputed) {
-            if (prec == 4 && approximation == OVERAPPROXIMATION)
-            {
-                Result approxResult = runFunction(transformer, 32, 2);
-                if (approxResult != UNKNOWN)
-                {
-                    return approxResult;
-                }
-            }
-
-
-            if (lastBW == 1) {
-                Result approxResult = runFunction(transformer, lastBW, prec);
-                if (approxResult != UNKNOWN) {
-                    return approxResult;
-                }
-
-                bool approxHappened = transformer.OperationApproximationHappened();
-
-                if (approxHappened || transformer.OperationApproximationHappened()) {
-                    prec *= 4;
-                    continue;
-                }
-
-                approxResult = runFunction(transformer, -1, prec);
-                if (approxResult != UNKNOWN) {
-                    return approxResult;
-                }
-
-                approxHappened = transformer.OperationApproximationHappened();
-
-                if (approxHappened || transformer.OperationApproximationHappened()) {
-                    prec *= 4;
-                    continue;
-                }
-
-                lastBW++;
-            }
-
-            for (int bw = lastBW; bw <= 32; bw += 2) {
-
-                std::stringstream ss;
-                ss << "bw: " << bw << ", resultComputed" << resultComputed;
-                Logger::Log("SOLVER", ss.str(), 1);
-
-                if (resultComputed) return UNKNOWN;
-                Result approxResult = runFunction(transformer, bw, prec);
-                if (approxResult != UNKNOWN) {
-                    return approxResult;
-                }
-
-                bool approxHappened = transformer.OperationApproximationHappened();
-                if (approxHappened || transformer.OperationApproximationHappened()) {
-                    lastBW = bw;
-                    break;
-                }
-
-                lastBW = bw;
-            }
-
-            prec *= 4;
-        }
-    } else if (config.approximationMethod == VARIABLES) {
-        Result approxResult = runFunction(transformer, 1, 0);
-        if (approxResult != UNKNOWN) {
-            return approxResult;
-        }
-
-        approxResult = runFunction(transformer, -1, 0);
-        if (approxResult != UNKNOWN) {
-            return approxResult;
-        }
-
-        for (int bw = 2; bw < 32; bw += 2) {
-            if (resultComputed) return UNKNOWN;
-            approxResult = runFunction(transformer, bw, 0);
-            if (approxResult != UNKNOWN) {
-                return approxResult;
-            }
-        }
-    }
-
-    return UNKNOWN;
-}
-*/
 
 z3::expr Solver::substituteModel(z3::expr& e, const std::map<std::string, std::vector<bool>>& model)
 {
