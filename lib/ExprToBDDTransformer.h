@@ -7,9 +7,9 @@
 #include <map>
 #include <functional>
 #include <unordered_map>
-#include "cudd/cudd.h"
-#include "cuddCpp/cuddObj.hh"
-#include "cudd/bvec_cudd.h"
+#include "cudd.h"
+#include <cuddObj.hh>
+#include "bvec_cudd.h"
 #include <z3++.h>
 #include "VariableOrderer.h"
 #include "Approximated.h"
