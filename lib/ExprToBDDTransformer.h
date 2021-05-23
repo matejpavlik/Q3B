@@ -7,8 +7,8 @@
 #include <map>
 #include <functional>
 #include <unordered_map>
-#include "cudd.h"
-#include <cuddObj.hh>
+#include "cudd/cudd.h"
+#include "cuddCpp/cuddObj.hh"
 #include "cudd/bvec_cudd.h"
 #include <z3++.h>
 #include "VariableOrderer.h"
@@ -62,11 +62,11 @@ class ExprToBDDTransformer
     void getVars(const z3::expr &e);
     void loadVars();
 
-    BDD loadBDDsFromExpr(z3::expr);
+    BDD loadBDDsFromExpr(z3::expr, bool precise);
     bool correctBoundVars(const std::vector<boundVar>&, const std::vector<boundVar>&) const;
-    BDD getBDDFromExpr(const z3::expr&, const std::vector<boundVar>&, bool onlyExistentials);
+    BDD getBDDFromExpr(const z3::expr&, const std::vector<boundVar>&, bool onlyExistentials, bool precise);
     Approximated<Bvec> getApproximatedVariable(const std::string&, int, const ApproximationType&);
-    Approximated<Bvec> getBvecFromExpr(const z3::expr&, const std::vector<boundVar>&);
+    Approximated<Bvec> getBvecFromExpr(const z3::expr&, const std::vector<boundVar>&, bool precise);
 
     unsigned int getNumeralValue(const z3::expr&) const;
     Bvec getNumeralBvec(const z3::expr&);
@@ -74,14 +74,14 @@ class ExprToBDDTransformer
 
     template < typename Top,  typename TisDefinite, typename TdefaultResult >
     BDD getConnectiveBdd(const std::vector<z3::expr>& arguments, const std::vector<boundVar>& boundVars, bool onlyExistentials,
-                                 Top&& op, TisDefinite&& isDefinite, TdefaultResult&& defaultResult)
+                         bool precise, Top&& op, TisDefinite&& isDefinite, TdefaultResult&& defaultResult)
     {
         std::vector<BDD> results;
 
         for (unsigned int i = 0; i < arguments.size(); i++)
         {
             if (isInterrupted()) { return defaultResult; }
-            auto argBdd = getBDDFromExpr(arguments[i], boundVars, onlyExistentials);
+            auto argBdd = getBDDFromExpr(arguments[i], boundVars, onlyExistentials, precise);
 
             if (isDefinite(argBdd)) { return argBdd; }
             else { results.push_back(argBdd); }
@@ -110,8 +110,8 @@ class ExprToBDDTransformer
         }
     }
 
-    BDD getConjunctionBdd(const std::vector<z3::expr>&, const std::vector<boundVar>&, bool);
-    BDD getDisjunctionBdd(const std::vector<z3::expr>&, const std::vector<boundVar>&, bool);
+    BDD getConjunctionBdd(const std::vector<z3::expr>&, const std::vector<boundVar>&, bool, bool);
+    BDD getDisjunctionBdd(const std::vector<z3::expr>&, const std::vector<boundVar>&, bool, bool);
 
     Approximation approximation;
     int variableBitWidth;
@@ -126,9 +126,9 @@ class ExprToBDDTransformer
     int cacheHits = 0;
 
     Bvec bvec_mul(Bvec&, Bvec&);
-    Approximated<Bvec> bvec_assocOp(const z3::expr&, const std::function<Bvec(Bvec, Bvec)>&, const std::vector<boundVar>&);
-    Approximated<Bvec> bvec_binOp(const z3::expr&, const std::function<Bvec(Bvec, Bvec)>&, const std::vector<boundVar>&);
-    Approximated<Bvec> bvec_unOp(const z3::expr&, const std::function<Bvec(Bvec)>&, const std::vector<boundVar>&);
+    Approximated<Bvec> bvec_assocOp(const z3::expr&, const std::function<Bvec(Bvec, Bvec)>&, const std::vector<boundVar>&, bool precise);
+    Approximated<Bvec> bvec_binOp(const z3::expr&, const std::function<Bvec(Bvec, Bvec)>&, const std::vector<boundVar>&, bool precise);
+    Approximated<Bvec> bvec_unOp(const z3::expr&, const std::function<Bvec(Bvec)>&, const std::vector<boundVar>&, bool precise);
 
     Config config;
 
