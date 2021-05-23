@@ -139,13 +139,16 @@ public:
         }
 
         for (size_t i = 0U; i < left.bitnum(); ++i) {
-            if (!right[i].IsUnknown()) {
+            if (right[i].IsOne() || right[i].IsZero()) {
                 p = right[i].Ite((!left[i]) | p, (!left[i]) & p);
-            } else if (!left[i].IsUnknown()) {
+            } else if (left[i].IsOne() || left[i].IsZero()) {
                 p = left[i].Ite(right[i] & p, right[i] | p);
             } else {
                 p = manager.bddUnknown();
             }
+        }
+        if (p == manager.bddUnknown()) {
+            p |= ~left[left.bitnum() - 1] & right[left.bitnum() - 1];
         }
 
         return p;
@@ -161,13 +164,17 @@ public:
         }
 
         for (size_t i = 0U; i < left.bitnum(); ++i) {
-            if (!right[i].IsUnknown()) {
+
+            if (right[i].IsOne() || right[i].IsZero()) {
                 p = right[i].Ite((!left[i]) | p, (!left[i]) & p);
-            } else if (!left[i].IsUnknown()) {
+            } else if (left[i].IsOne() || left[i].IsZero()) {
                 p = left[i].Ite(right[i] & p, right[i] | p);
             } else {
                 p = manager.bddUnknown();
             }
+        }
+        if (p == manager.bddUnknown()) {
+            p |= ~left[left.bitnum() - 1] & right[left.bitnum() - 1];
         }
 
         return p;
