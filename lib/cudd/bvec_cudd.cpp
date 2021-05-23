@@ -344,9 +344,9 @@ namespace cudd {
     }
 
     void
-    Bvec::bvec_div_rec(Bvec& divisor, Bvec& remainder, Bvec& result, size_t step) {
+    Bvec::bvec_div_rec(Bvec& divisor, Bvec& remainder, Bvec& result, size_t step, bool precise) {
         Cudd& manager = *result.m_manager;
-        BDD isSmaller = bvec_lte(divisor, remainder);
+        BDD isSmaller = bvec_lte(divisor, remainder, precise);
         Bvec newResult = result.bvec_shlfixed(1, isSmaller);
         Bvec zero = bvec_build(manager, divisor.bitnum(), false);
         Bvec sub = reserve(manager, divisor.bitnum());
@@ -359,7 +359,7 @@ namespace cudd {
         Bvec newRemainder = tmp.bvec_shlfixed(1, result[divisor.bitnum() - 1]);
 
         if (step > 1) {
-            bvec_div_rec(divisor, newRemainder, newResult, step - 1);
+            bvec_div_rec(divisor, newRemainder, newResult, step - 1, precise);
         }
 
         result = newResult;
@@ -367,14 +367,14 @@ namespace cudd {
     }
 
     int
-    Bvec::bvec_divfixed(size_t con, Bvec& result, Bvec& rem) const {
+    Bvec::bvec_divfixed(size_t con, Bvec& result, Bvec& rem, bool precise) const {
         if (con > 0) {
             Bvec divisor = bvec_con(*m_manager, bitnum(), con);
             Bvec tmp = bvec_false(*m_manager, bitnum());
             Bvec tmpremainder = tmp.bvec_shlfixed(1, m_bitvec[bitnum() - 1]);
             Bvec res = bvec_shlfixed(1, m_manager->bddZero());
 
-            bvec_div_rec(divisor, tmpremainder, result, divisor.bitnum());
+            bvec_div_rec(divisor, tmpremainder, result, divisor.bitnum(), precise);
             Bvec remainder = tmpremainder.bvec_shrfixed(1, m_manager->bddZero());
 
             result = res;
@@ -406,7 +406,7 @@ namespace cudd {
 	unsigned int preciseBdds = 0;
         for (size_t i = 0U; i < right.bitnum() + 1; ++i)
 	{
-            BDD divLteRem = bvec_lte(div, rem);
+            BDD divLteRem = bvec_lte(div, rem, nodeLimit == UINT_MAX);
             Bvec remSubDiv = bvec_sub(rem, div);
 
             for (size_t j = 0U; j < bitnum; ++j) {
@@ -509,7 +509,7 @@ namespace cudd {
     }
 
     Bvec
-    Bvec::bvec_shl(const Bvec& left, const Bvec& right, const BDD& con) {
+    Bvec::bvec_shl(const Bvec& left, const Bvec& right, const BDD& con, bool precise) {
         Cudd& manager = check_same_cudd(*left.m_manager, *right.m_manager);
         Bvec res(manager);
         if (left.bitnum() == 0 || right.bitnum() == 0) {
@@ -535,7 +535,7 @@ namespace cudd {
 
         /* At last make sure 'c' is shifted in for r-values > l-bitnum */
         Bvec val = bvec_con(manager, right.bitnum(), left.bitnum());
-        BDD rEquN = bvec_gth(right, val);
+        BDD rEquN = bvec_gth(right, val, precise);
 
         for (size_t i = 0U; i < left.bitnum(); i++) {
             res[i] |= (rEquN & con);
@@ -559,7 +559,7 @@ namespace cudd {
     }
 
     Bvec
-    Bvec::bvec_shr(const Bvec& left, const Bvec& right, const BDD& con) {
+    Bvec::bvec_shr(const Bvec& left, const Bvec& right, const BDD& con, bool precise) {
         Cudd& manager = check_same_cudd(*left.m_manager, *right.m_manager);
         Bvec res(manager);
         if (left.bitnum() == 0 || right.bitnum() == 0) {
@@ -585,7 +585,7 @@ namespace cudd {
 
         /* At last make sure 'c' is shifted in for r-values > l-bitnum */
         Bvec val = bvec_con(manager, right.bitnum(), left.bitnum());
-        rEquN = bvec_gth(right, val);
+        rEquN = bvec_gth(right, val, precise);
         tmp1 = rEquN & con;
 
         for (size_t i = 0U; i < left.bitnum(); ++i) {
@@ -595,23 +595,23 @@ namespace cudd {
     }
 
     BDD
-    Bvec::bvec_gth(const Bvec& left, const Bvec& right) {
-        return bvec_lth(right, left);
+    Bvec::bvec_gth(const Bvec& left, const Bvec& right, bool precise) {
+        return bvec_lth(right, left, precise);
     }
 
     BDD
-    Bvec::bvec_gte(const Bvec& left, const Bvec& right) {
-        return !bvec_lte(right, left);
+    Bvec::bvec_gte(const Bvec& left, const Bvec& right, bool precise) {
+        return !bvec_lte(right, left, precise);
     }
 
     BDD
-    Bvec::bvec_sgth(const Bvec& left, const Bvec& right) {
-        return !bvec_slte(left, right);
+    Bvec::bvec_sgth(const Bvec& left, const Bvec& right, bool precise) {
+        return !bvec_slte(left, right, precise);
     }
 
     BDD
-    Bvec::bvec_sgte(const Bvec& left, const Bvec& right) {
-        return !bvec_slth(left, right);
+    Bvec::bvec_sgte(const Bvec& left, const Bvec& right, bool precise) {
+        return !bvec_slth(left, right, precise);
     }
 
     Cudd&

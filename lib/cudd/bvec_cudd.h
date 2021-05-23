@@ -1,11 +1,15 @@
 #ifndef BDD_BVEC_H
 #define BDD_BVEC_H
 
+#include <chrono>
+#include <assert.h>
 #include <functional>
 #include <fstream>
 #include <vector>
-#include <cuddObj.hh>
+#include "../cuddCpp/cuddObj.hh"
 #include <iostream>
+
+using namespace std::chrono;
 
 namespace cudd {
 
@@ -103,7 +107,7 @@ public:
     bvec_mul_nodeLimit(const Bvec& left, const Bvec& right, unsigned int);
 
     int
-    bvec_divfixed(size_t con, Bvec& result, Bvec& rem) const;
+    bvec_divfixed(size_t con, Bvec& result, Bvec& rem, bool precise) const;
 
     static int
     bvec_div(const Bvec& left, const Bvec& right, Bvec& result, Bvec& rem);
@@ -121,41 +125,61 @@ public:
     bvec_shlfixed(unsigned int pos, const BDD& con) const;
 
     static Bvec
-    bvec_shl(const Bvec& left, const Bvec& right, const BDD& con);
+    bvec_shl(const Bvec& left, const Bvec& right, const BDD& con, bool precise);
 
     Bvec
     bvec_shrfixed(unsigned int pos, const BDD& con) const;
 
     static Bvec
-    bvec_shr(const Bvec& left, const Bvec& right, const BDD& con);
+    bvec_shr(const Bvec& left, const Bvec& right, const BDD& con, bool precise);
 
     static BDD
-    bvec_lth(const Bvec& left, const Bvec& right) {
+    bvec_lth_precise(const Bvec& left, const Bvec& right) {
         Cudd& manager = check_same_cudd(*left.m_manager, *right.m_manager);
-        BDD p = manager.bddZero();
+        BDD p =  manager.bddZero();
 
         if (left.bitnum() == 0 || right.bitnum() == 0 || left.bitnum() != right.bitnum()) {
             return p;
         }
 
-        for (size_t i = 0U; i < left.bitnum(); ++i) {
-            if (right[i].IsOne() || right[i].IsZero()) {
-                p = right[i].Ite((!left[i]) | p, (!left[i]) & p);
-            } else if (left[i].IsOne() || left[i].IsZero()) {
-                p = left[i].Ite(right[i] & p, right[i] | p);
-            } else {
-                p = manager.bddUnknown();
-            }
+
+        return p;
+    }
+
+    static BDD
+    bvec_lth(const Bvec& left, const Bvec& right, bool precise) {
+        Cudd& manager = check_same_cudd(*left.m_manager, *right.m_manager);
+        BDD p =  manager.bddZero();
+
+        if (left.bitnum() == 0 || right.bitnum() == 0 || left.bitnum() != right.bitnum()) {
+            return p;
         }
-        if (p == manager.bddUnknown()) {
-            p |= ~left[left.bitnum() - 1] & right[left.bitnum() - 1];
+
+        if (precise) {
+            for (size_t i = 0U; i < left.bitnum(); ++i) {
+                p = (~left[i] & right[i]) |
+                    (left[i].Xnor(right[i]) & p);
+            }
+        } else {
+            for (size_t i = 0U; i < left.bitnum(); ++i) {
+                if (right[i].IsOne() || right[i].IsZero() || right[i].IsVar()) {
+                    p = right[i].Ite((!left[i]) | p, (!left[i]) & p);
+                } else if (left[i].IsOne() || left[i].IsZero() || left[i].IsVar()) {
+                    p = left[i].Ite(right[i] & p, right[i] | p);
+                } else {
+                    p = manager.bddUnknown();
+                }
+            }
+            if (p == manager.bddUnknown()) {
+                p |= ~left[left.bitnum() - 1] & right[left.bitnum() - 1];
+            }
         }
 
         return p;
     }
 
     static BDD
-    bvec_lte(const Bvec& left, const Bvec& right) {
+    bvec_lte(const Bvec& left, const Bvec& right, bool precise) {
         Cudd& manager = check_same_cudd(*left.m_manager, *right.m_manager);
         BDD p = manager.bddOne();
 
@@ -163,18 +187,25 @@ public:
             return p;
         }
 
-        for (size_t i = 0U; i < left.bitnum(); ++i) {
-
-            if (right[i].IsOne() || right[i].IsZero()) {
-                p = right[i].Ite((!left[i]) | p, (!left[i]) & p);
-            } else if (left[i].IsOne() || left[i].IsZero()) {
-                p = left[i].Ite(right[i] & p, right[i] | p);
-            } else {
-                p = manager.bddUnknown();
+        if (precise) {
+            for (size_t i = 0U; i < left.bitnum(); ++i) {
+                p = (~left[i] & right[i]) |
+                    (left[i].Xnor(right[i]) & p);
             }
-        }
-        if (p == manager.bddUnknown()) {
-            p |= ~left[left.bitnum() - 1] & right[left.bitnum() - 1];
+        } else {
+            for (size_t i = 0U; i < left.bitnum(); ++i) {
+
+                if (right[i].IsOne() || right[i].IsZero() || right[i].IsVar()) {
+                    p = right[i].Ite((!left[i]) | p, (!left[i]) & p);
+                } else if (left[i].IsOne() || left[i].IsZero() || left[i].IsVar()) {
+                    p = left[i].Ite(right[i] & p, right[i] | p);
+                } else {
+                    p = manager.bddUnknown();
+                }
+            }
+            if (p == manager.bddUnknown()) {
+                p |= ~left[left.bitnum() - 1] & right[left.bitnum() - 1];
+            }
         }
 
         return p;
@@ -182,13 +213,13 @@ public:
 
 
     static BDD
-    bvec_gth(const Bvec& left, const Bvec& right);
+    bvec_gth(const Bvec& left, const Bvec& right, bool precise);
 
     static BDD
-    bvec_gte(const Bvec& left, const Bvec& right);
+    bvec_gte(const Bvec& left, const Bvec& right, bool precise);
 
     static BDD
-    bvec_slth(const Bvec& left, const Bvec& right) {
+    bvec_slth(const Bvec& left, const Bvec& right, bool precise) {
         Cudd& manager = check_same_cudd(*left.m_manager, *right.m_manager);
 
         if (left.bitnum() == 0 || right.bitnum() == 0) {
@@ -216,13 +247,13 @@ public:
             const Bvec &r_short = left.bvec_coerce(size);
             return differentSigns |                             //    must be - < +
                 (left[size].Xnor(right[size]) &                 // or sgn l = sgn r and
-                (((!left[size]) & bvec_lth(l_short, r_short)) | //         |l| < |r| for positive numbers
-                  (left[size] & bvec_lth(r_short, l_short))));  //      or |r| < |l| for negative numbers
+                (((!left[size]) & bvec_lth(l_short, r_short, precise)) | //         |l| < |r| for positive numbers
+                  (left[size] & bvec_lth(r_short, l_short, precise))));  //      or |r| < |l| for negative numbers
         }
     }
 
     static BDD
-    bvec_slte(const Bvec& left, const Bvec& right) {
+    bvec_slte(const Bvec& left, const Bvec& right, bool precise) {
         Cudd& manager = check_same_cudd(*left.m_manager, *right.m_manager);
         if (left.bitnum() == 0 || right.bitnum() == 0) {
             return manager.bddZero();
@@ -247,16 +278,16 @@ public:
             const Bvec &r_short = left.bvec_coerce(size);
             return differentSigns |                                //    must be - < +
                    (left[size].Xnor(right[size]) &                 // or sgn l = sgn r and
-                   (((!left[size]) & bvec_lte(l_short, r_short)) | //         |l| <= |r| for positive numbers
-                     (left[size] & bvec_lte(r_short, l_short))));  //      or |r| <= |l| for negative numbers
+                   (((!left[size]) & bvec_lte(l_short, r_short, precise)) | //         |l| <= |r| for positive numbers
+                     (left[size] & bvec_lte(r_short, l_short, precise))));  //      or |r| <= |l| for negative numbers
         }
     }
 
     static BDD
-    bvec_sgth(const Bvec& left, const Bvec& right);
+    bvec_sgth(const Bvec& left, const Bvec& right, bool precise);
 
     static BDD
-    bvec_sgte(const Bvec& left, const Bvec& right);
+    bvec_sgte(const Bvec& left, const Bvec& right, bool precise);
 
     static BDD
     bvec_equ(const Bvec& left, const Bvec& right) {
@@ -315,13 +346,13 @@ public:
     operator<<(int con) const { return bvec_shlfixed(con, m_manager->bddZero()); }
 
     Bvec
-    operator<<(const Bvec& other) const { return bvec_shl(*this, other, m_manager->bddZero()); }
+    operator<<(const Bvec& other) const { return bvec_shl(*this, other, m_manager->bddZero(), false); }
 
     Bvec
     operator>>(int con) const { return bvec_shrfixed(con, m_manager->bddZero()); }
 
     Bvec
-    operator>>(const Bvec& other) const { return bvec_shr(*this, other, m_manager->bddZero()); }
+    operator>>(const Bvec& other) const { return bvec_shr(*this, other, m_manager->bddZero(), false); }
 
     Bvec
     operator+(const Bvec& other) const { return bvec_add(*this, other); }
@@ -349,16 +380,16 @@ public:
     operator*=(const Bvec& other) { *this = bvec_mul(*this, other); return *this; }
 
     BDD
-    operator<(const Bvec& other) const { return bvec_lth(*this, other); }
+    operator<(const Bvec& other) const { return bvec_lth(*this, other, false); }
 
     BDD
-    operator<=(const Bvec& other) const { return bvec_lte(*this, other); }
+    operator<=(const Bvec& other) const { return bvec_lte(*this, other, false); }
 
     BDD
-    operator>(const Bvec& other) const { return bvec_gth(*this, other); }
+    operator>(const Bvec& other) const { return bvec_gth(*this, other, false); }
 
     BDD
-    operator>=(const Bvec& other) const { return bvec_gte(*this, other); }
+    operator>=(const Bvec& other) const { return bvec_gte(*this, other, false); }
 
     BDD
     operator==(const Bvec& other) const { return bvec_equ(*this, other); }
@@ -398,7 +429,7 @@ private:
     check_same_cudd(Cudd& first, Cudd& second);
 
     static void
-    bvec_div_rec(Bvec& divisor, Bvec& remainder, Bvec& result, size_t step);
+    bvec_div_rec(Bvec& divisor, Bvec& remainder, Bvec& result, size_t step, bool precise);
 
     static BDD
     bdd_and(const BDD& first, const BDD& second);
