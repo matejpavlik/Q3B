@@ -143,21 +143,26 @@ public:
         }
         
         for (size_t i = 0U; i < left.bitnum(); ++i) {
+            
+                p = (~left[i] & right[i]) | (left[i].Xnor(right[i]) & p);
+            
+            /*
             if (right[i].IsOne()) {
                 p = ~left[i] | p;
             } else if (right[i].IsZero()) {
                 p = ~left[i] & p;
-       /*     } else if (right[i].IsVar()) {
-                p = right[i].Ite((!left[i]) | p, (!left[i]) & p);*/
+       //     } else if (right[i].IsVar()) {
+       //         p = right[i].Ite((!left[i]) | p, (!left[i]) & p);
             } else if (left[i].IsOne()) {
                 p = right[i] & p;
             } else if (left[i].IsZero()) {
                 p = right[i] | p;
-           /* } else if (left[i].IsVar()) {
-                p = left[i].Ite(right[i] & p, right[i] | p);*/
+       //     } else if (left[i].IsVar()) {
+       //         p = left[i].Ite(right[i] & p, right[i] | p);
             } else {
                 p = (~left[i] & right[i]) | (left[i].Xnor(right[i]) & p);
             }
+            */
         }
         
         /*if (precise) {
@@ -193,22 +198,25 @@ public:
         }
         
         for (size_t i = 0U; i < left.bitnum(); ++i) {
-            if (right[i].IsOne()) {
+            
+                p = (~left[i] & right[i]) | (left[i].Xnor(right[i]) & p);
+            
+        /*    if (right[i].IsOne()) {
                 p = ~left[i] | p;
             } else if (right[i].IsZero()) {
                 p = ~left[i] & p;
-         /*   } else if (right[i].IsVar()) {
-                p = right[i].Ite((!left[i]) | p, (!left[i]) & p);*/
+         //   } else if (right[i].IsVar()) {
+         //       p = right[i].Ite((!left[i]) | p, (!left[i]) & p);
             } else if (left[i].IsOne()) {
                 p = right[i] & p;
             } else if (left[i].IsZero()) {
                 p = right[i] | p;
-         /*   } else if (left[i].IsVar()) {
-                p = left[i].Ite(right[i] & p, right[i] | p);*/
+         //   } else if (left[i].IsVar()) {
+         //       p = left[i].Ite(right[i] & p, right[i] | p);
             } else {
                 p = (~left[i] & right[i]) | (left[i].Xnor(right[i]) & p);
             }
-        }
+        }*/
         
         /*if (right[i].IsOne() || right[i].IsZero() || right[i].IsVar()) {
             p = right[i].Ite((!left[i]) | p, (!left[i]) & p);
