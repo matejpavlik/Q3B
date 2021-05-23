@@ -216,7 +216,8 @@ public:
             } else {
                 p = (~left[i] & right[i]) | (left[i].Xnor(right[i]) & p);
             }
-        }*/
+            */
+        }
         
         /*if (right[i].IsOne() || right[i].IsZero() || right[i].IsVar()) {
             p = right[i].Ite((!left[i]) | p, (!left[i]) & p);
