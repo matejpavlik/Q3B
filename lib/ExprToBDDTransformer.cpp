@@ -146,9 +146,6 @@ void ExprToBDDTransformer::loadVars()
 
 BDD ExprToBDDTransformer::loadBDDsFromExpr(expr e, bool precise)
 {
-    if(Cudd_DebugCheck(bddManager.getManager())) {
-        assert(0);
-    }
     bddExprCache.clear();
     bvecExprCache.clear();
 
@@ -165,8 +162,7 @@ BDD ExprToBDDTransformer::loadBDDsFromExpr(expr e, bool precise)
     variableApproximationHappened = false;
     auto result = getBDDFromExpr(e, {}, true, precise);
 
-    // TODO : ¿ is this important ?
-    // operationApproximationHappened = !result.IsPrecise();
+    operationApproximationHappened = !result.IsPrecise();
 
     bddExprCache.clear();
     bvecExprCache.clear();
