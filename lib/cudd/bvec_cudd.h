@@ -244,7 +244,7 @@ public:
         else
         {
             const Bvec &l_short = left.bvec_coerce(size);
-            const Bvec &r_short = left.bvec_coerce(size);
+            const Bvec &r_short = right.bvec_coerce(size);
             return differentSigns |                             //    must be - < +
                 (left[size].Xnor(right[size]) &                 // or sgn l = sgn r and
                 (((!left[size]) & bvec_lth(l_short, r_short, precise)) | //         |l| < |r| for positive numbers
@@ -275,7 +275,7 @@ public:
         else
         {
             const Bvec &l_short = left.bvec_coerce(size);
-            const Bvec &r_short = left.bvec_coerce(size);
+            const Bvec &r_short = right.bvec_coerce(size);
             return differentSigns |                                //    must be - < +
                    (left[size].Xnor(right[size]) &                 // or sgn l = sgn r and
                    (((!left[size]) & bvec_lte(l_short, r_short, precise)) | //         |l| <= |r| for positive numbers
