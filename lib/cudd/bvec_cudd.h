@@ -147,14 +147,14 @@ public:
                 p = ~left[i] | p;
             } else if (right[i].IsZero()) {
                 p = ~left[i] & p;
-            } else if (right[i].IsVar()) {
-                p = right[i].Ite((!left[i]) | p, (!left[i]) & p);
+       /*     } else if (right[i].IsVar()) {
+                p = right[i].Ite((!left[i]) | p, (!left[i]) & p);*/
             } else if (left[i].IsOne()) {
                 p = right[i] & p;
             } else if (left[i].IsZero()) {
                 p = right[i] | p;
-            } else if (left[i].IsVar()) {
-                p = left[i].Ite(right[i] & p, right[i] | p);
+           /* } else if (left[i].IsVar()) {
+                p = left[i].Ite(right[i] & p, right[i] | p);*/
             } else {
                 p = (~left[i] & right[i]) | (left[i].Xnor(right[i]) & p);
             }
@@ -197,14 +197,14 @@ public:
                 p = ~left[i] | p;
             } else if (right[i].IsZero()) {
                 p = ~left[i] & p;
-            } else if (right[i].IsVar()) {
-                p = right[i].Ite((!left[i]) | p, (!left[i]) & p);
+         /*   } else if (right[i].IsVar()) {
+                p = right[i].Ite((!left[i]) | p, (!left[i]) & p);*/
             } else if (left[i].IsOne()) {
                 p = right[i] & p;
             } else if (left[i].IsZero()) {
                 p = right[i] | p;
-            } else if (left[i].IsVar()) {
-                p = left[i].Ite(right[i] & p, right[i] | p);
+         /*   } else if (left[i].IsVar()) {
+                p = left[i].Ite(right[i] & p, right[i] | p);*/
             } else {
                 p = (~left[i] & right[i]) | (left[i].Xnor(right[i]) & p);
             }
