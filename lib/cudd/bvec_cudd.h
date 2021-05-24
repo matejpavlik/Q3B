@@ -143,47 +143,8 @@ public:
         }
         
         for (size_t i = 0U; i < left.bitnum(); ++i) {
-            
                 p = (~left[i] & right[i]) | (left[i].Xnor(right[i]) & p);
-            
-            /*
-            if (right[i].IsOne()) {
-                p = ~left[i] | p;
-            } else if (right[i].IsZero()) {
-                p = ~left[i] & p;
-       //     } else if (right[i].IsVar()) {
-       //         p = right[i].Ite((!left[i]) | p, (!left[i]) & p);
-            } else if (left[i].IsOne()) {
-                p = right[i] & p;
-            } else if (left[i].IsZero()) {
-                p = right[i] | p;
-       //     } else if (left[i].IsVar()) {
-       //         p = left[i].Ite(right[i] & p, right[i] | p);
-            } else {
-                p = (~left[i] & right[i]) | (left[i].Xnor(right[i]) & p);
-            }
-            */
         }
-        
-        /*if (precise) {
-            for (size_t i = 0U; i < left.bitnum(); ++i) {
-                p = (~left[i] & right[i]) |
-                    (left[i].Xnor(right[i]) & p);
-            }
-        } else {
-            for (size_t i = 0U; i < left.bitnum(); ++i) {
-                if (right[i].IsOne() || right[i].IsZero() || right[i].IsVar()) {
-                    p = right[i].Ite((!left[i]) | p, (!left[i]) & p);
-                } else if (left[i].IsOne() || left[i].IsZero() || left[i].IsVar()) {
-                    p = left[i].Ite(right[i] & p, right[i] | p);
-                } else {
-                    p = manager.bddUnknown();
-                }
-            }
-            if (p == manager.bddUnknown()) {
-                p |= ~left[left.bitnum() - 1] & right[left.bitnum() - 1];
-            }
-        }*/
 
         return p;
     }
@@ -198,54 +159,8 @@ public:
         }
         
         for (size_t i = 0U; i < left.bitnum(); ++i) {
-            
                 p = (~left[i] & right[i]) | (left[i].Xnor(right[i]) & p);
-            
-        /*    if (right[i].IsOne()) {
-                p = ~left[i] | p;
-            } else if (right[i].IsZero()) {
-                p = ~left[i] & p;
-         //   } else if (right[i].IsVar()) {
-         //       p = right[i].Ite((!left[i]) | p, (!left[i]) & p);
-            } else if (left[i].IsOne()) {
-                p = right[i] & p;
-            } else if (left[i].IsZero()) {
-                p = right[i] | p;
-         //   } else if (left[i].IsVar()) {
-         //       p = left[i].Ite(right[i] & p, right[i] | p);
-            } else {
-                p = (~left[i] & right[i]) | (left[i].Xnor(right[i]) & p);
-            }
-            */
         }
-        
-        /*if (right[i].IsOne() || right[i].IsZero() || right[i].IsVar()) {
-            p = right[i].Ite((!left[i]) | p, (!left[i]) & p);
-        } else if (left[i].IsOne() || left[i].IsZero() || left[i].IsVar()) {
-            p = left[i].Ite(right[i] & p, right[i] | p);
-        } else {
-            p = (~left[i] & right[i]) | (left[i].Xnor(right[i]) & p);
-        }*/
-        
-        /*if (precise) {
-            for (size_t i = 0U; i < left.bitnum(); ++i) {
-                p = (~left[i] & right[i]) | (left[i].Xnor(right[i]) & p);
-            }
-        } else {
-            for (size_t i = 0U; i < left.bitnum(); ++i) {
-                
-                if (right[i].IsOne() || right[i].IsZero() || right[i].IsVar()) {
-                    p = right[i].Ite((!left[i]) | p, (!left[i]) & p);
-                } else if (left[i].IsOne() || left[i].IsZero() || left[i].IsVar()) {
-                    p = left[i].Ite(right[i] & p, right[i] | p);
-                } else {
-                    p = (~left[i] & right[i]) | (left[i].Xnor(right[i]) & p);
-                }
-            }
-            if (p == manager.bddUnknown()) {
-                p |= ~left[left.bitnum() - 1] & right[left.bitnum() - 1];
-            }
-        }*/
 
         return p;
     }
@@ -273,9 +188,7 @@ public:
             // negative < positive
             return differentSigns;
         }
-        // TODO : this is prly not general enough, the resulting BDD should be tested
-        // else if (left[size].IsZero() && right[size].IsOne())
-        else if (((!left[size]) & right[size]).IsOne())
+        else if (left[size].IsZero() && right[size].IsOne())
         {
             // positive < negative
             return manager.bddZero();
@@ -284,8 +197,12 @@ public:
         {
             const Bvec &l_short = left.bvec_coerce(size);
             const Bvec &r_short = right.bvec_coerce(size);
+            BDD equalSigns = left[size].Xnor(right[size]);
+            if (equalSigns.IsZero())    // don't need to compute lth which is possibly expensive
+                return differentSigns;
+            
             return differentSigns |                             //    must be - < +
-                (left[size].Xnor(right[size]) &                 // or sgn l = sgn r and
+                (equalSigns &                                   // or sgn l = sgn r and
                 (((!left[size]) & bvec_lth(l_short, r_short, precise)) | //         |l| < |r| for positive numbers
                   (left[size] & bvec_lth(r_short, l_short, precise))));  //      or |r| < |l| for negative numbers
         }
@@ -306,7 +223,7 @@ public:
             // negative <= positive
             return differentSigns;
         }
-        else if (((!left[size]) & right[size]).IsOne())
+        else if (left[size].IsZero() && right[size].IsOne())
         {
             // positive <= negative
             return manager.bddZero();
@@ -315,8 +232,12 @@ public:
         {
             const Bvec &l_short = left.bvec_coerce(size);
             const Bvec &r_short = right.bvec_coerce(size);
+            BDD equalSigns = left[size].Xnor(right[size]);
+            if (equalSigns.IsZero())    // don't need to compute lte which is possibly expensive
+                return differentSigns;
+            
             return differentSigns |                                //    must be - < +
-                   (left[size].Xnor(right[size]) &                 // or sgn l = sgn r and
+                   (equalSigns &                                   // or sgn l = sgn r and
                    (((!left[size]) & bvec_lte(l_short, r_short, precise)) | //         |l| <= |r| for positive numbers
                      (left[size] & bvec_lte(r_short, l_short, precise))));  //      or |r| <= |l| for negative numbers
         }
@@ -448,7 +369,6 @@ public:
         return count;
     }
 
-    // TODO : not being unknown does not imply precision
     bool isPrecise() const
     {
         for (const auto &bdd : m_bitvec)
