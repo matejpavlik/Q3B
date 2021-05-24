@@ -188,9 +188,7 @@ public:
             // negative < positive
             return differentSigns;
         }
-        // TODO : this is prly not general enough, the resulting BDD should be tested
-        // else if (left[size].IsZero() && right[size].IsOne())
-        else if (((!left[size]) & right[size]).IsOne())
+        else if (left[size].IsZero() && right[size].IsOne())
         {
             // positive < negative
             return manager.bddZero();
@@ -199,8 +197,12 @@ public:
         {
             const Bvec &l_short = left.bvec_coerce(size);
             const Bvec &r_short = right.bvec_coerce(size);
+            BDD equalSigns = left[size].Xnor(right[size]);
+            if (equalSigns.IsZero())    // don't need to compute lth which is possibly expensive
+                return differentSigns;
+            
             return differentSigns |                             //    must be - < +
-                (left[size].Xnor(right[size]) &                 // or sgn l = sgn r and
+                (equalSigns &                                   // or sgn l = sgn r and
                 (((!left[size]) & bvec_lth(l_short, r_short, precise)) | //         |l| < |r| for positive numbers
                   (left[size] & bvec_lth(r_short, l_short, precise))));  //      or |r| < |l| for negative numbers
         }
@@ -221,7 +223,7 @@ public:
             // negative <= positive
             return differentSigns;
         }
-        else if (((!left[size]) & right[size]).IsOne())
+        else if (left[size].IsZero() && right[size].IsOne())
         {
             // positive <= negative
             return manager.bddZero();
@@ -230,8 +232,12 @@ public:
         {
             const Bvec &l_short = left.bvec_coerce(size);
             const Bvec &r_short = right.bvec_coerce(size);
+            BDD equalSigns = left[size].Xnor(right[size]);
+            if (equalSigns.IsZero())    // don't need to compute lte which is possibly expensive
+                return differentSigns;
+            
             return differentSigns |                                //    must be - < +
-                   (left[size].Xnor(right[size]) &                 // or sgn l = sgn r and
+                   (equalSigns &                                   // or sgn l = sgn r and
                    (((!left[size]) & bvec_lte(l_short, r_short, precise)) | //         |l| <= |r| for positive numbers
                      (left[size] & bvec_lte(r_short, l_short, precise))));  //      or |r| <= |l| for negative numbers
         }
