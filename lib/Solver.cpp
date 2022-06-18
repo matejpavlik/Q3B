@@ -209,9 +209,9 @@ Result Solver::SolveParallel(z3::expr expr) {
         else if (globalResult == UNSAT) globalResult = SAT;
     }
 
-    main.join();
-    over.join();
-    under.join();
+    main.detach();
+    over.detach();
+    under.detach();
 
     return globalResult;
 }
@@ -239,7 +239,6 @@ Result Solver::runOverApproximation(ExprToBDDTransformer &transformer, int bitWi
 
     if (Solver::resultComputed) return UNKNOWN;
 
-    // TODO : dis need not work with [?] BDDs
     transformer.PrintNecessaryValues(returned);
 
     if (config.checkModels)
