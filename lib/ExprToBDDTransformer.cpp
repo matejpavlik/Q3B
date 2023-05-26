@@ -18,11 +18,24 @@ using namespace std::placeholders;
 ExprToBDDTransformer::ExprToBDDTransformer(z3::context &ctx, z3::expr e, Config config) : config(config), expression(e)
 {
     this->context = &ctx;
-    configureReorder();
+    configureTermination();
 
     loadVars();
+    configureReorder();
 
     setApproximationType(SIGN_EXTEND);
+}
+
+int is_interrupted(const void*)
+{
+    return Solver::resultComputed;
+}
+
+void ExprToBDDTransformer::configureTermination()
+{
+    bddManager.RegisterTerminationCallback(
+        &is_interrupted,
+        nullptr);
 }
 
 void ExprToBDDTransformer::getVars(const z3::expr &e)
