@@ -95,7 +95,13 @@ public:
     bvec_add_nodeLimit(const Bvec& left, const Bvec& right, bool precise, unsigned int);
 
     static Bvec
+    bvec_add_reduced(const Bvec& left, const Bvec& right, traverse_heuristic heu, unsigned int nodeLimit);
+
+    static Bvec
     bvec_sub(const Bvec& left, const Bvec& right, bool precise);
+
+    static Bvec
+    bvec_sub_reduced(const Bvec& left, const Bvec& right, traverse_heuristic heu, unsigned int nodeLimit);
 
     Bvec
     bvec_mulfixed(int con, bool precise) const;
@@ -106,6 +112,9 @@ public:
     static Bvec
     bvec_mul_nodeLimit(const Bvec& left, const Bvec& right, bool precise, unsigned int);
 
+    static Bvec
+    bvec_mul_reduced(const Bvec& left, const Bvec& right, traverse_heuristic heu, unsigned int nodeLimit);
+
     int
     bvec_divfixed(size_t con, Bvec& result, Bvec& rem, bool precise) const;
 
@@ -115,11 +124,17 @@ public:
     static int
     bvec_div_nodeLimit(const Bvec& left, const Bvec& right, Bvec& result, Bvec& rem, bool precise, unsigned int);
 
+    static int
+    bvec_div_reduced(const Bvec& left, const Bvec& right, Bvec& result, Bvec& rem, traverse_heuristic heu, unsigned int nodeLimit);
+
     static Bvec
     bvec_ite(const BDD& val, const Bvec& left, const Bvec& right, bool precise);
 
     static Bvec
     bvec_ite_nodeLimit(const BDD& val, const Bvec& left, const Bvec& right, bool precise, unsigned int);
+
+    static Bvec
+    bvec_ite_reduced(const BDD& val, const Bvec& left, const Bvec& right, traverse_heuristic heu, unsigned int nodeLimit);
 
     Bvec
     bvec_shlfixed(unsigned int pos, const BDD& con) const;
@@ -127,11 +142,17 @@ public:
     static Bvec
     bvec_shl(const Bvec& left, const Bvec& right, const BDD& con, bool precise);
 
+    static Bvec
+    bvec_shl_reduced(const Bvec& left, const Bvec& right, const BDD& con, traverse_heuristic heu, unsigned int nodeLimit);
+
     Bvec
     bvec_shrfixed(unsigned int pos, const BDD& con) const;
 
     static Bvec
     bvec_shr(const Bvec& left, const Bvec& right, const BDD& con, bool precise);
+
+    static Bvec
+    bvec_shr_reduced(const Bvec& left, const Bvec& right, const BDD& con, traverse_heuristic heu, unsigned int nodeLimit);
 
     static BDD
     bvec_lth(const Bvec& left, const Bvec& right, bool precise) {
@@ -171,6 +192,23 @@ public:
                 }
                 */
             }
+        }
+
+        return p;
+    }
+
+    static BDD
+    bvec_lth_reduced(const Bvec& left, const Bvec& right, traverse_heuristic heu, unsigned int nodeLimit) {
+        Cudd& manager = check_same_cudd(*left.m_manager, *right.m_manager);
+        BDD p =  manager.bddZero();
+
+        if (left.bitnum() == 0 || right.bitnum() == 0 || left.bitnum() != right.bitnum()) {
+            return p;
+        }
+        
+        for (size_t i = 0U; i < left.bitnum(); ++i) {
+            p = ((~left[i]).AndLim(right[i], heu, nodeLimit))
+                .OrLim(left[i].XnorLim(right[i], heu, nodeLimit).AndLim(p, heu, nodeLimit), heu, nodeLimit);
         }
 
         return p;
@@ -220,12 +258,34 @@ public:
         return p;
     }
 
+    static BDD
+    bvec_lte_reduced(const Bvec& left, const Bvec& right, traverse_heuristic heu, unsigned int nodeLimit) {
+        Cudd& manager = check_same_cudd(*left.m_manager, *right.m_manager);
+        BDD p = manager.bddOne();
+
+        if (left.bitnum() == 0 || right.bitnum() == 0 || left.bitnum() != right.bitnum()) {
+            return p;
+        }
+        
+        for (size_t i = 0U; i < left.bitnum(); ++i) {
+            p = ((~left[i]).AndLim(right[i], heu, nodeLimit))
+                .OrLim(left[i].XnorLim(right[i], heu, nodeLimit).AndLim(p, heu, nodeLimit), heu, nodeLimit);
+        }
+
+        return p;
+    }
 
     static BDD
     bvec_gth(const Bvec& left, const Bvec& right, bool precise);
 
     static BDD
+    bvec_gth_reduced(const Bvec& left, const Bvec& right, traverse_heuristic heu, unsigned int nodeLimit);
+
+    static BDD
     bvec_gte(const Bvec& left, const Bvec& right, bool precise);
+
+    static BDD
+    bvec_gte_reduced(const Bvec& left, const Bvec& right, traverse_heuristic heu, unsigned int nodeLimit);
 
     static BDD
     bvec_slth(const Bvec& left, const Bvec& right, bool precise) {
@@ -259,6 +319,41 @@ public:
             return precise
                 ? differentSigns.OrP(equalSigns.AndP(bvec_lth(l_short, r_short, precise)))
                 : differentSigns | (equalSigns & bvec_lth(l_short, r_short, precise));
+        }
+    }
+
+    static BDD
+    bvec_slth_reduced(const Bvec& left, const Bvec& right, traverse_heuristic heu, unsigned int nodeLimit) {
+        Cudd& manager = check_same_cudd(*left.m_manager, *right.m_manager);
+
+        if (left.bitnum() == 0 || right.bitnum() == 0) {
+            return manager.bddZero();
+        }
+
+        size_t size = left.bitnum() - 1;
+
+        BDD differentSigns = left[size].AndLim(~right[size], heu, nodeLimit);
+        if (differentSigns.IsOne())
+        {
+            // negative < positive
+            return differentSigns;
+        }
+        else if (left[size].IsZero() && right[size].IsOne())
+        {
+            // positive < negative
+            return manager.bddZero();
+        }
+        else
+        {
+            const Bvec &l_short = left.bvec_coerce(size);
+            const Bvec &r_short = right.bvec_coerce(size);
+            BDD equalSigns = left[size].XnorLim(right[size], heu, nodeLimit);
+            if (equalSigns.IsZero()) {    // don't need to compute lth which is possibly expensive
+                return differentSigns;
+            
+            }
+            return differentSigns.OrLim(equalSigns.AndLim(
+                bvec_lth_reduced(l_short, r_short, heu, nodeLimit), heu, nodeLimit), heu, nodeLimit);
         }
     }
 
@@ -297,10 +392,51 @@ public:
     }
 
     static BDD
+    bvec_slte_reduced(const Bvec& left, const Bvec& right, traverse_heuristic heu, unsigned int nodeLimit) {
+        Cudd& manager = check_same_cudd(*left.m_manager, *right.m_manager);
+        
+        if (left.bitnum() == 0 || right.bitnum() == 0) {
+            return manager.bddZero();
+        }
+
+        size_t size = left.bitnum() - 1;
+
+        BDD differentSigns = left[size].AndLim(~right[size], heu, nodeLimit);
+        if (differentSigns.IsOne())
+        {
+            // negative <= positive
+            return differentSigns;
+        }
+        else if (left[size].IsZero() && right[size].IsOne())
+        {
+            // positive <= negative
+            return manager.bddZero();
+        }
+        else
+        {
+            const Bvec &l_short = left.bvec_coerce(size);
+            const Bvec &r_short = right.bvec_coerce(size);
+            BDD equalSigns = left[size].XnorLim(right[size], heu, nodeLimit);
+            if (equalSigns.IsZero()) {    // don't need to compute lte which is possibly expensive
+                return differentSigns;
+            }
+            
+            return differentSigns.OrLim(equalSigns.AndLim(
+                bvec_lte_reduced(l_short, r_short, heu, nodeLimit), heu, nodeLimit), heu, nodeLimit);
+        }
+    }
+
+    static BDD
     bvec_sgth(const Bvec& left, const Bvec& right, bool precise);
 
     static BDD
+    bvec_sgth_reduced(const Bvec& left, const Bvec& right, traverse_heuristic heu, unsigned int nodeLimit);
+
+    static BDD
     bvec_sgte(const Bvec& left, const Bvec& right, bool precise);
+
+    static BDD
+    bvec_sgte_reduced(const Bvec& left, const Bvec& right, traverse_heuristic heu, unsigned int nodeLimit);
 
     static BDD
     bvec_equ(const Bvec& left, const Bvec& right, bool precise) {
@@ -320,6 +456,25 @@ public:
        }
        return p;
     }
+    
+    static BDD
+    bvec_equ_reduced(const Bvec& left, const Bvec& right, traverse_heuristic heu, unsigned int nodeLimit) {
+       Cudd& manager = check_same_cudd(*left.m_manager, *right.m_manager);
+       BDD p = manager.bddOne();
+
+       if (left.bitnum() == 0 || right.bitnum() == 0 || left.bitnum() != right.bitnum()) {
+           return manager.bddZero();
+       }
+
+       for (size_t i = 0U; i < left.bitnum(); ++i) {
+           p = p.AndLim(left[i].XnorLim(right[i], heu, nodeLimit), heu, nodeLimit);
+           if (p.IsZero())
+           {
+               return p;
+           }
+       }
+       return p;
+    }
 
     static BDD
     bvec_nequ(const Bvec& left, const Bvec& right, bool precise) {
@@ -332,6 +487,25 @@ public:
 
         for (size_t i = 0U; i < left.bitnum(); ++i) {
             p = precise ? p.OrP(left[i].XorP(right[i])) : p | left[i].Xor(right[i]);
+            if (p.IsOne())
+            {
+                return p;
+            }
+        }
+        return p;
+    }
+
+    static BDD
+    bvec_nequ_reduced(const Bvec& left, const Bvec& right, traverse_heuristic heu, unsigned int nodeLimit) {
+        Cudd& manager = check_same_cudd(*left.m_manager, *right.m_manager);
+        BDD p = manager.bddZero();
+
+        if (left.bitnum() == 0 || right.bitnum() == 0 || left.bitnum() != right.bitnum()) {
+            return manager.bddZero();
+        }
+
+        for (size_t i = 0U; i < left.bitnum(); ++i) {
+            p = p.OrLim(left[i].XorLim(right[i], heu, nodeLimit), heu, nodeLimit);
             if (p.IsOne())
             {
                 return p;
