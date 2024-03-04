@@ -1,5 +1,7 @@
 #pragma once
 
+#include "cuddObj.hh"
+
 enum ApproximationMethod { NONE, VARIABLES, OPERATIONS, BOTH };
 enum InitialOrder { INTERLEAVE_ALL, HEURISTIC, SEQUENTIAL };
 enum ReorderType { NO_REORDER, WIN2, WIN2_ITE, WIN3, WIN3_ITE, SIFT, SIFT_ITE };
@@ -18,6 +20,9 @@ struct Config
     bool goalUnconstrained = true;
 
     bool useDontCares = false;
+    
+    bool reduceBdds = false;
+    traverse_heuristic traverseHeu = GREEDY_TRAVERSE_TWO_STEP;
 
     bool checkModels = true;
     bool addCongruences = true;
