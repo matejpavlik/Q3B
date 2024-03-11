@@ -187,16 +187,42 @@ BDD ExprToBDDTransformer::loadBDDsFromExpr(expr e, bool precise)
 
 BDD ExprToBDDTransformer::getConjunctionBdd(const vector<expr> &arguments, const vector<boundVar> &boundVars, bool onlyExistentials, bool precise)
 {
+    unsigned int nodeLimit = precisionMultiplier * operationPrecision;
+    
+    if (precise) {
+        return getConnectiveBdd(arguments, boundVars, onlyExistentials, precise,
+                            [] (auto& a, auto& b) { return a.AndP(b); },
+                            [](const auto a) { return a.IsZero(); },
+                            bddManager.bddOne());
+    }
+    
     return getConnectiveBdd(arguments, boundVars, onlyExistentials, precise,
-                            [](auto& a, auto& b) { return a * b; },
+                            [&, nodeLimit] (auto& a, auto& b) {
+                                return config.reduceBdds
+                                    ? a.AndLim(b, config.traverseHeu, nodeLimit)
+                                    : (a * b);
+                            },
                             [](const auto a) { return a.IsZero(); },
                             bddManager.bddOne());
 }
 
 BDD ExprToBDDTransformer::getDisjunctionBdd(const vector<expr> &arguments, const vector<boundVar> &boundVars, bool onlyExistentials, bool precise)
 {
+    unsigned int nodeLimit = precisionMultiplier * operationPrecision;
+    
+    if (precise) {
+        return getConnectiveBdd(arguments, boundVars, onlyExistentials, precise,
+                            [] (auto& a, auto& b) { return a.OrP(b); },
+                            [](const auto a) { return a.IsOne(); },
+                            bddManager.bddZero());
+    }
+    
     return getConnectiveBdd(arguments, boundVars, onlyExistentials, precise,
-                            [](auto& a, auto& b) { return a + b; },
+                            [&, nodeLimit] (auto& a, auto& b) {
+                                return config.reduceBdds
+                                    ? a.OrLim(b, config.traverseHeu, nodeLimit)
+                                    : (a + b);
+                            },
                             [](const auto a) { return a.IsOne(); },
                             bddManager.bddZero());
 }
@@ -239,6 +265,7 @@ BDD ExprToBDDTransformer::getBDDFromExpr(const expr &e, const vector<boundVar>& 
         }
     }
 
+    unsigned int nodeLimit = precisionMultiplier * operationPrecision;
     if (e.is_var())
     {
         Z3_ast ast = (Z3_ast)e;
@@ -280,13 +307,31 @@ BDD ExprToBDDTransformer::getBDDFromExpr(const expr &e, const vector<boundVar>& 
             assert(sort.is_bv() || sort.is_bool());
             if (sort.is_bv())
             {
-                result = Bvec::bvec_equ(getBvecFromExpr(e.arg(0), boundVars, precise).value,
-                                        getBvecFromExpr(e.arg(1), boundVars, precise).value, precise);
+                if (config.reduceBdds && !precise) {
+                    result = Bvec::bvec_equ_reduced(
+                        getBvecFromExpr(e.arg(0), boundVars, precise).value,
+                        getBvecFromExpr(e.arg(1), boundVars, precise).value,
+                        config.traverseHeu,
+                        nodeLimit);
+                } else {
+                    result = Bvec::bvec_equ(
+                        getBvecFromExpr(e.arg(0), boundVars, precise).value,
+                        getBvecFromExpr(e.arg(1), boundVars, precise).value,
+                        precise);
+                }
             }
             else if (sort.is_bool())
             {
-                result = getBDDFromExpr(e.arg(0), boundVars, false, precise).Xnor(
-                        getBDDFromExpr(e.arg(1), boundVars, false, precise));
+                if (config.reduceBdds && !precise) {
+                    result = getBDDFromExpr(e.arg(0), boundVars, false, precise).XnorLim(
+                        getBDDFromExpr(e.arg(1), boundVars, false, precise), config.traverseHeu, nodeLimit);
+                } else {
+                    result = precise
+                        ? getBDDFromExpr(e.arg(0), boundVars, false, precise).XnorP(
+                            getBDDFromExpr(e.arg(1), boundVars, false, precise))
+                        : getBDDFromExpr(e.arg(0), boundVars, false, precise).Xnor(
+                            getBDDFromExpr(e.arg(1), boundVars, false, precise));
+                }
             }
 
             return insertIntoCaches(e, result, boundVars);
@@ -322,8 +367,17 @@ BDD ExprToBDDTransformer::getBDDFromExpr(const expr &e, const vector<boundVar>& 
         {
             checkNumberOfArguments<2>(e);
 
-            auto result = !getBDDFromExpr(e.arg(0), boundVars, onlyExistentials, precise) +
+            BDD result;
+            if (config.reduceBdds && !precise) {
+                result = (!getBDDFromExpr(e.arg(0), boundVars, onlyExistentials, precise))
+                    .OrLim(getBDDFromExpr(e.arg(1), boundVars, onlyExistentials, precise), config.traverseHeu, nodeLimit);
+            } else {
+                result = precise
+                    ? (!getBDDFromExpr(e.arg(0), boundVars, onlyExistentials, precise)).OrP(
+                          getBDDFromExpr(e.arg(1), boundVars, onlyExistentials, precise))
+                    : !getBDDFromExpr(e.arg(0), boundVars, onlyExistentials, precise) +
                           getBDDFromExpr(e.arg(1), boundVars, onlyExistentials, precise);
+            }
             return insertIntoCaches(e, result, boundVars);
         }
         else if (decl_kind == Z3_OP_ULEQ)
@@ -334,7 +388,11 @@ BDD ExprToBDDTransformer::getBDDFromExpr(const expr &e, const vector<boundVar>& 
             auto arg1 = getBvecFromExpr(e.arg(1), boundVars, precise).value;
 
             if (Solver::resultComputed) return bddManager.bddZero();
-            return insertIntoCaches(e, Bvec::bvec_lte(arg0, arg1, precise), boundVars);
+  
+            auto result = (config.reduceBdds && !precise)
+                ? Bvec::bvec_lte_reduced(arg0, arg1, config.traverseHeu, nodeLimit)
+                : Bvec::bvec_lte(arg0, arg1, precise);
+            return insertIntoCaches(e, result, boundVars);
         }
         else if (decl_kind == Z3_OP_ULT)
         {
@@ -344,7 +402,11 @@ BDD ExprToBDDTransformer::getBDDFromExpr(const expr &e, const vector<boundVar>& 
             auto arg1 = getBvecFromExpr(e.arg(1), boundVars, precise).value;
 
             if (Solver::resultComputed) return bddManager.bddZero();
-            return insertIntoCaches(e, Bvec::bvec_lth(arg0, arg1, precise), boundVars);
+ 
+            auto result = (config.reduceBdds && !precise)
+                ? Bvec::bvec_lth_reduced(arg0, arg1, config.traverseHeu, nodeLimit)
+                : Bvec::bvec_lth(arg0, arg1, precise);
+            return insertIntoCaches(e, result, boundVars);
         }
         else if (decl_kind == Z3_OP_UGEQ)
         {
@@ -354,7 +416,11 @@ BDD ExprToBDDTransformer::getBDDFromExpr(const expr &e, const vector<boundVar>& 
             auto arg1 = getBvecFromExpr(e.arg(1), boundVars, precise).value;
 
             if (Solver::resultComputed) return bddManager.bddZero();
-            return insertIntoCaches(e, Bvec::bvec_lte(arg1, arg0, precise), boundVars);
+ 
+            auto result = (config.reduceBdds && !precise)
+                ? Bvec::bvec_lte_reduced(arg1, arg0, config.traverseHeu, nodeLimit)
+                : Bvec::bvec_lte(arg1, arg0, precise);
+            return insertIntoCaches(e, result, boundVars);
         }
         else if (decl_kind == Z3_OP_UGT)
         {
@@ -364,7 +430,11 @@ BDD ExprToBDDTransformer::getBDDFromExpr(const expr &e, const vector<boundVar>& 
             auto arg1 = getBvecFromExpr(e.arg(1), boundVars, precise).value;
 
             if (Solver::resultComputed) return bddManager.bddZero();
-            return insertIntoCaches(e, Bvec::bvec_lth(arg1, arg0, precise), boundVars);
+
+            auto result = (config.reduceBdds && !precise)
+                ? Bvec::bvec_lth_reduced(arg1, arg0, config.traverseHeu, nodeLimit)
+                : Bvec::bvec_lth(arg1, arg0, precise);
+            return insertIntoCaches(e, result, boundVars);
         }
         else if (decl_kind == Z3_OP_SLEQ)
         {
@@ -374,6 +444,27 @@ BDD ExprToBDDTransformer::getBDDFromExpr(const expr &e, const vector<boundVar>& 
             auto arg0 = getBvecFromExpr(e.arg(0), boundVars, precise).value;
             auto arg1 = getBvecFromExpr(e.arg(1), boundVars, precise).value;
             if (Solver::resultComputed) return bddManager.bddZero();
+
+	    if (config.approximationMethod == OPERATIONS || config.approximationMethod == BOTH)
+	    {
+	        Bvec leastNumber = Bvec::bvec_false(bddManager, arg0.bitnum());
+		leastNumber.set(arg0.bitnum() - 1, bddManager.bddOne());
+
+		Bvec greatestNumber = Bvec::bvec_true(bddManager, arg0.bitnum());
+		greatestNumber.set(arg0.bitnum() - 1, bddManager.bddZero());
+		
+		if (config.reduceBdds && !precise) {
+		    result = Bvec::bvec_slte_reduced(arg0, arg1, config.traverseHeu, nodeLimit)
+		        .OrLim(Bvec::bvec_equ_reduced(arg0, leastNumber, config.traverseHeu, nodeLimit), config.traverseHeu, nodeLimit)
+		        .OrLim(Bvec::bvec_equ_reduced(arg1, greatestNumber, config.traverseHeu, nodeLimit), config.traverseHeu, nodeLimit);
+		} else {
+		    result = Bvec::bvec_slte(arg0, arg1, precise)
+		         | Bvec::bvec_equ(arg0, leastNumber, precise)
+		         | Bvec::bvec_equ(arg1, greatestNumber, precise);
+		}
+		
+		return result;
+	    }
 
             result = Bvec::bvec_slte(arg0, arg1, precise);
 
@@ -387,6 +478,27 @@ BDD ExprToBDDTransformer::getBDDFromExpr(const expr &e, const vector<boundVar>& 
             auto arg0 = getBvecFromExpr(e.arg(0), boundVars, precise).value;
             auto arg1 = getBvecFromExpr(e.arg(1), boundVars, precise).value;
             if (Solver::resultComputed) return bddManager.bddZero();
+            
+            if (config.approximationMethod == OPERATIONS || config.approximationMethod == BOTH)
+	    {
+	        Bvec leastNumber = Bvec::bvec_false(bddManager, arg0.bitnum());
+		leastNumber.set(arg0.bitnum() - 1, bddManager.bddOne());
+
+		Bvec greatestNumber = Bvec::bvec_true(bddManager, arg0.bitnum());
+		greatestNumber.set(arg0.bitnum() - 1, bddManager.bddZero());
+		
+		if (config.reduceBdds && !precise) {
+		    result = Bvec::bvec_slth_reduced(arg0, arg1, config.traverseHeu, nodeLimit)
+		        .AndLim(Bvec::bvec_nequ_reduced(arg0, greatestNumber, config.traverseHeu, nodeLimit), config.traverseHeu, nodeLimit)
+		        .AndLim(Bvec::bvec_nequ_reduced(arg1, leastNumber, config.traverseHeu, nodeLimit), config.traverseHeu, nodeLimit);
+		} else {
+		    result = Bvec::bvec_slth(arg0, arg1, precise)
+		         & Bvec::bvec_nequ(arg0, greatestNumber, precise)
+		         & Bvec::bvec_nequ(arg1, leastNumber, precise);
+		}
+		
+		return result;
+	    }
 
             result = Bvec::bvec_slth(arg0, arg1, precise);
 
@@ -400,7 +512,11 @@ BDD ExprToBDDTransformer::getBDDFromExpr(const expr &e, const vector<boundVar>& 
             auto arg1 = getBDDFromExpr(e.arg(1), boundVars, false, precise);
 
             if (Solver::resultComputed) return bddManager.bddZero();
-            auto result = arg0.Xnor(arg1);
+            auto result = precise 
+                ? arg0.XnorP(arg1)
+                : config.reduceBdds
+                ? arg0.XnorLim(arg1, config.traverseHeu, nodeLimit)
+                : arg0.Xnor(arg1);
             return insertIntoCaches(e, result, boundVars);
         }
         else if (decl_kind == Z3_OP_ITE)
@@ -412,7 +528,11 @@ BDD ExprToBDDTransformer::getBDDFromExpr(const expr &e, const vector<boundVar>& 
             auto arg2 = getBDDFromExpr(e.arg(2), boundVars, onlyExistentials, precise);
 
             if (Solver::resultComputed) return bddManager.bddZero();
-            auto result = arg0.Ite(arg1, arg2);
+            auto result = precise 
+                ? arg0.IteP(arg1, arg2)
+                : config.reduceBdds
+                ? arg0.IteLim(arg1, arg2, config.traverseHeu, nodeLimit)
+                : arg0.Ite(arg1, arg2);
 
             return insertIntoCaches(e, result, boundVars);
         }
@@ -625,16 +745,29 @@ Approximated<Bvec> ExprToBDDTransformer::getBvecFromExpr(const expr &e, const ve
             if ((config.approximationMethod == OPERATIONS || config.approximationMethod == BOTH) &&
                 operationPrecision != 0)
             {
-                return bvec_assocOp(e, std::bind(Bvec::bvec_add_nodeLimit, _1, _2, false, precisionMultiplier * operationPrecision), boundVars, precise);
+                unsigned int nodeLimit = precisionMultiplier * operationPrecision;
+                if (config.reduceBdds && !precise) {
+                    return bvec_assocOp(e, std::bind(Bvec::bvec_add_reduced, _1, _2, config.traverseHeu, nodeLimit), boundVars, precise);
+                } else {
+                    return bvec_assocOp(e, std::bind(Bvec::bvec_add_nodeLimit, _1, _2, precise, nodeLimit), boundVars, precise);
+                }
             }
 
-            return bvec_assocOp(e, /*[&] (auto x, auto y) { return x + y; }*/
-                                   std::bind(Bvec::bvec_add, _1, _2, true), boundVars, precise);
+            return bvec_assocOp(e, std::bind(Bvec::bvec_add, _1, _2, precise), boundVars, precise);
         }
         else if (decl_kind == Z3_OP_BSUB)
         {
             checkNumberOfArguments<2>(e);
-            return bvec_binOp(e, [] (auto x, auto y) { return x - y; }, boundVars, precise);
+            if ((config.approximationMethod == OPERATIONS || config.approximationMethod == BOTH) &&
+                operationPrecision != 0)
+            {
+                unsigned int nodeLimit = precisionMultiplier * operationPrecision;
+                if (config.reduceBdds && !precise) {
+                    return bvec_binOp(e, std::bind(Bvec::bvec_sub_reduced, _1, _2, config.traverseHeu, nodeLimit), boundVars, precise);
+                }
+            }
+            
+            return bvec_binOp(e, std::bind(Bvec::bvec_sub, _1, _2, precise), boundVars, precise);
         }
         else if (decl_kind == Z3_OP_BSHL)
         {
@@ -644,7 +777,16 @@ Approximated<Bvec> ExprToBDDTransformer::getBvecFromExpr(const expr &e, const ve
             }
             else
             {
-                return bvec_binOp(e, [] (auto x, auto y) { return x << y; }, boundVars, precise);
+                if ((config.approximationMethod == OPERATIONS || config.approximationMethod == BOTH) &&
+                    operationPrecision != 0)
+                {
+                    unsigned int nodeLimit = precisionMultiplier * operationPrecision;
+                    if (config.reduceBdds && !precise) {
+                        return bvec_binOp(e, std::bind(Bvec::bvec_shl_reduced, _1, _2, bddManager.bddZero(), config.traverseHeu, nodeLimit), boundVars, precise);
+                    }
+                }
+            
+                return bvec_binOp(e, std::bind(Bvec::bvec_shl, _1, _2, bddManager.bddZero(), precise), boundVars, precise);
             }
         }
         else if (decl_kind == Z3_OP_BLSHR)
@@ -655,7 +797,16 @@ Approximated<Bvec> ExprToBDDTransformer::getBvecFromExpr(const expr &e, const ve
             }
             else
             {
-                return bvec_binOp(e, [] (auto x, auto y) { return x >> y; }, boundVars, precise);
+                if ((config.approximationMethod == OPERATIONS || config.approximationMethod == BOTH) &&
+                    operationPrecision != 0)
+                {
+                    unsigned int nodeLimit = precisionMultiplier * operationPrecision;
+                    if (config.reduceBdds && !precise) {
+                        return bvec_binOp(e, std::bind(Bvec::bvec_shr_reduced, _1, _2, bddManager.bddZero(), config.traverseHeu, nodeLimit), boundVars, precise);
+                    }
+                }
+            
+                return bvec_binOp(e, std::bind(Bvec::bvec_shr, _1, _2, bddManager.bddZero(), precise), boundVars, precise);
             }
         }
         else if (decl_kind == Z3_OP_BASHR)
@@ -667,7 +818,16 @@ Approximated<Bvec> ExprToBDDTransformer::getBvecFromExpr(const expr &e, const ve
             }
             else
             {
-                return bvec_binOp(e, [&] (auto x, auto y) { return Bvec::bvec_shr(x, y, x[bitwidth - 1], precise); }, boundVars, precise);
+                if ((config.approximationMethod == OPERATIONS || config.approximationMethod == BOTH) &&
+                    operationPrecision != 0)
+                {
+                    unsigned int nodeLimit = precisionMultiplier * operationPrecision;
+                    if (config.reduceBdds && !precise) {
+                        return bvec_binOp(e, [&] (const Bvec& x, const Bvec& y) { return Bvec::bvec_shr_reduced(x, y, x[bitwidth - 1], config.traverseHeu, nodeLimit); }, boundVars, precise);
+                    }
+                }
+            
+                return bvec_binOp(e, [&] (const Bvec& x, const Bvec& y) { return Bvec::bvec_shr(x, y, x[bitwidth - 1], precise); }, boundVars, precise);
             }
         }
         else if (decl_kind == Z3_OP_CONCAT)
@@ -719,19 +879,34 @@ Approximated<Bvec> ExprToBDDTransformer::getBvecFromExpr(const expr &e, const ve
         }
         else if (decl_kind == Z3_OP_BOR)
         {
-            return bvec_assocOp(e, [&](const Bvec &a, const Bvec &b) { return a | b; }, boundVars, precise);
+            if (config.reduceBdds && !precise) {
+                unsigned int nodeLimit = precisionMultiplier * operationPrecision;
+                return bvec_assocOp(e, std::bind(Bvec::bvec_map2, _1, _2, [&, nodeLimit] (const BDD& x, const BDD& y) { return x.OrLim(y, config.traverseHeu, nodeLimit); }), boundVars, precise);
+            }
+            
+            return bvec_assocOp(e, std::bind(Bvec::bvec_map2, _1, _2, [precise] (const BDD& x, const BDD& y) { return precise ? x.OrP(y) : x | y; }), boundVars, precise);
         }
         else if (decl_kind == Z3_OP_BAND)
         {
-            return bvec_assocOp(e, [&](const Bvec &a, const Bvec &b) { return a & b; }, boundVars, precise);
+            if (config.reduceBdds && !precise) {
+                unsigned int nodeLimit = precisionMultiplier * operationPrecision;
+                return bvec_assocOp(e, std::bind(Bvec::bvec_map2, _1, _2, [&, nodeLimit] (const BDD& x, const BDD& y) { return x.AndLim(y, config.traverseHeu, nodeLimit); }), boundVars, precise);
+            }
+            
+            return bvec_assocOp(e, std::bind(Bvec::bvec_map2, _1, _2, [precise] (const BDD& x, const BDD& y) { return precise ? x.AndP(y) : x & y; }), boundVars, precise);
         }
         else if (decl_kind == Z3_OP_BXOR)
         {
-            return bvec_assocOp(e, [&](const Bvec &a, const Bvec &b) { return a ^ b; }, boundVars, precise);
+            if (config.reduceBdds && !precise) {
+                unsigned int nodeLimit = precisionMultiplier * operationPrecision;
+                return bvec_assocOp(e, std::bind(Bvec::bvec_map2, _1, _2, [&, nodeLimit] (const BDD& x, const BDD& y) { return x.XorLim(y, config.traverseHeu, nodeLimit); }), boundVars, precise);
+            }
+            
+            return bvec_assocOp(e, std::bind(Bvec::bvec_map2, _1, _2, [precise] (const BDD& x, const BDD& y) { return precise ? x.XorP(y) : x ^ y; }), boundVars, precise);
         }
         else if (decl_kind == Z3_OP_BMUL)
         {
-            return bvec_assocOp(e, [&](auto x, auto y){ return bvec_mul(x, y); }, boundVars, precise);
+            return bvec_assocOp(e, [&](auto x, auto y){ return bvec_mul(x, y, precise); }, boundVars, precise);
         }
         else if (decl_kind == Z3_OP_BUREM || decl_kind == Z3_OP_BUREM_I || decl_kind == Z3_OP_BUDIV || decl_kind == Z3_OP_BUDIV_I)
         {
@@ -754,7 +929,13 @@ Approximated<Bvec> ExprToBDDTransformer::getBvecFromExpr(const expr &e, const ve
             else if ((config.approximationMethod == OPERATIONS || config.approximationMethod == BOTH) &&
                      operationPrecision != 0)
             {
-                result = Bvec::bvec_div_nodeLimit(arg0, arg1, div, rem, precise, precisionMultiplier*operationPrecision);
+                unsigned int nodeLimit = precisionMultiplier * operationPrecision;
+                
+                if (config.reduceBdds && !precise) {
+                    result = Bvec::bvec_div_reduced(arg0, arg1, div, rem, config.traverseHeu, nodeLimit);
+                } else {
+                    result = Bvec::bvec_div_nodeLimit(arg0, arg1, div, rem, precise, nodeLimit);
+                }
             }
             else
             {
@@ -830,10 +1011,20 @@ Approximated<Bvec> ExprToBDDTransformer::getBvecFromExpr(const expr &e, const ve
             checkNumberOfArguments<3>(e);
 
             auto arg0 = getBDDFromExpr(e.arg(0), boundVars, false, precise);
+            if (!(arg0 ^ arg0).IsZero()) {
+                auto unknown = Bvec{bddManager,
+                                    e.get_sort().bv_size(),
+                                    bddManager.bddUnknown()};
+                return insertIntoCaches(e, {unknown, APPROXIMATED, APPROXIMATED}, boundVars);
+            }
             auto arg1 = getBvecFromExpr(e.arg(1), boundVars, precise).value;
             auto arg2 = getBvecFromExpr(e.arg(2), boundVars, precise).value;
 
-            auto result = Bvec::bvec_ite(arg0, arg1, arg2, precise);
+            Bvec result =
+                (config.reduceBdds && !precise)
+                ? Bvec::bvec_ite_reduced(arg0, arg1, arg2, config.traverseHeu, precisionMultiplier * operationPrecision)
+                : Bvec::bvec_ite(arg0, arg1, arg2, precise);
+
             return insertIntoCaches(e, {result, APPROXIMATED, APPROXIMATED}, boundVars);
         }
         else
@@ -923,7 +1114,7 @@ BDD ExprToBDDTransformer::ProcessOverapproximation(int bitWidth, unsigned int pr
     return loadBDDsFromExpr(expression, false);
 }
 
-Bvec ExprToBDDTransformer::bvec_mul(Bvec &arg0, Bvec& arg1)
+Bvec ExprToBDDTransformer::bvec_mul(Bvec &arg0, Bvec& arg1, bool precise)
 {
     unsigned int bitNum = arg0.bitnum();
 
@@ -994,10 +1185,14 @@ Bvec ExprToBDDTransformer::bvec_mul(Bvec &arg0, Bvec& arg1)
 
     if (config.approximationMethod == OPERATIONS || config.approximationMethod == BOTH)
     {
-        return Bvec::bvec_mul_nodeLimit(arg0, arg1, false, precisionMultiplier * operationPrecision).bvec_coerce(bitNum);
+        unsigned int nodeLimit = precisionMultiplier * operationPrecision;
+        if (config.reduceBdds && !precise) {
+            return Bvec::bvec_mul_reduced(arg0, arg1, config.traverseHeu, nodeLimit).bvec_coerce(bitNum);
+        }
+        return Bvec::bvec_mul_nodeLimit(arg0, arg1, precise, nodeLimit).bvec_coerce(bitNum);
     }
 
-    return Bvec::bvec_mul(arg0, arg1, true).bvec_coerce(bitNum);
+    return Bvec::bvec_mul(arg0, arg1, precise).bvec_coerce(bitNum);
 }
 
 Approximated<Bvec> ExprToBDDTransformer::bvec_assocOp(const z3::expr& e, const std::function<Bvec(Bvec, Bvec)>& op, const std::vector<boundVar>& boundVars, bool precise)

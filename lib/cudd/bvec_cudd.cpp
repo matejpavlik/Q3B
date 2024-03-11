@@ -223,6 +223,30 @@ namespace cudd {
     }
 
     Bvec
+    Bvec::bvec_add_reduced(const Bvec& left, const Bvec& right, traverse_heuristic heu, unsigned int nodeLimit) {
+        Cudd& manager = check_same_cudd(*left.m_manager, *right.m_manager);
+        Bvec res(manager);
+        BDD comp = manager.bddZero();
+
+        if (left.bitnum() == 0 || right.bitnum() == 0 || left.bitnum() != right.bitnum())
+        {
+            return res;
+        }
+
+        reserve(res, left.bitnum());
+
+        for (size_t i = 0U; i < left.bitnum(); ++i) {
+
+            res.m_bitvec.push_back(left[i].XorLim(right[i], heu, nodeLimit).XorLim(comp, heu, nodeLimit));
+
+            comp = (left[i].AndLim(right[i], heu, nodeLimit))
+                .OrLim(comp.AndLim(left[i].OrLim(right[i], heu, nodeLimit), heu, nodeLimit), heu, nodeLimit);
+        }
+
+        return res;
+    }
+
+    Bvec
     Bvec::bvec_sub(const Bvec& left, const Bvec& right, bool precise) {
         Cudd& manager = check_same_cudd(*left.m_manager, *right.m_manager);
         Bvec res(manager);
@@ -243,6 +267,29 @@ namespace cudd {
             comp = precise
                 ? (left[i].AndP(right[i]).AndP(comp)).OrP((~left[i]).AndP(right[i].OrP(comp)))
                 : (left[i] & right[i] & comp) | (~left[i] & (right[i] | comp));
+        }
+
+        return res;
+    }
+
+    Bvec
+    Bvec::bvec_sub_reduced(const Bvec& left, const Bvec& right, traverse_heuristic heu, unsigned int nodeLimit) {
+        Cudd& manager = check_same_cudd(*left.m_manager, *right.m_manager);
+        Bvec res(manager);
+        BDD comp = manager.bddZero();
+
+        if (left.bitnum() == 0 || right.bitnum() == 0 || left.bitnum() != right.bitnum())
+        {
+            return res;
+        }
+
+        reserve(res, left.bitnum());
+
+        for (size_t i = 0U; i < left.bitnum(); ++i) {
+
+            res.m_bitvec.push_back(left[i].XorLim(right[i], heu, nodeLimit).XorLim(comp, heu, nodeLimit));
+            comp = (left[i].AndLim(right[i], heu, nodeLimit).AndLim(comp, heu, nodeLimit))
+                .OrLim((~left[i]).AndLim(right[i].OrLim(comp, heu, nodeLimit), heu, nodeLimit), heu, nodeLimit);
         }
 
         return res;
@@ -344,6 +391,41 @@ namespace cudd {
 	    res[m] = manager.bddUnknown();
 	}
 
+        return res;
+    }
+
+    Bvec
+    Bvec::bvec_mul_reduced(const Bvec& left, const Bvec& right, traverse_heuristic heu, unsigned int nodeLimit) {
+        size_t bitnum = std::max(left.bitnum(), right.bitnum());
+        Cudd& manager = check_same_cudd(*left.m_manager, *right.m_manager);
+        Bvec res = bvec_false(manager, bitnum);
+
+        if (left.bitnum() == 0 || right.bitnum() == 0) {
+            return res;
+        }
+        Bvec leftshifttmp = Bvec(left);
+        Bvec leftshift = leftshifttmp.bvec_coerce(bitnum);
+
+        for (size_t i = 0U; i < right.bitnum(); ++i) {
+	    if (!right[i].IsZero())
+	    {
+		Bvec added = bvec_add_reduced(res, leftshift, heu, nodeLimit);
+
+		for (size_t m = 0U; m < right.bitnum(); ++m) {
+
+		    res[m] = right[i].IteLim(added[m], res[m], heu, nodeLimit);
+
+		}
+	    }
+
+            /* Shift 'leftshift' one bit left */
+            for (size_t m = bitnum - 1U; m >= 1U; --m) {
+                leftshift[m] = leftshift[m - 1];
+            }
+
+            leftshift[0] = manager.bddZero();
+        }
+	
         return res;
     }
 
@@ -464,6 +546,46 @@ namespace cudd {
         return 0;
     }
 
+    int
+    Bvec::bvec_div_reduced(const Bvec& left, const Bvec& right, Bvec& result, Bvec& remainder, traverse_heuristic heu, unsigned int nodeLimit) {
+        size_t bitnum = left.bitnum() + right.bitnum();
+        Cudd& manager = check_same_cudd(*left.m_manager, *right.m_manager);
+        if (left.bitnum() == 0 || right.bitnum() == 0 || left.bitnum() != right.bitnum()) {
+            return 1;
+        }
+
+        Bvec rem = left.bvec_coerce(bitnum);
+        Bvec divtmp = right.bvec_coerce(bitnum);
+        Bvec div = divtmp.bvec_shlfixed(left.bitnum(), manager.bddZero());
+
+        Bvec res = bvec_false(manager, right.bitnum());
+
+        for (size_t i = 0U; i < right.bitnum() + 1; ++i)
+	{
+            BDD divLteRem = bvec_lte_reduced(div, rem, heu, nodeLimit);
+            Bvec remSubDiv = bvec_sub_reduced(rem, div, heu, nodeLimit);
+
+            for (size_t j = 0U; j < bitnum; ++j) {
+                rem[j] = divLteRem.IteLim(remSubDiv[j], rem[j], heu, nodeLimit);
+            }
+
+            if (i > 0) {
+                res[right.bitnum() - i] = divLteRem;
+            }
+
+	    /* Shift 'div' one bit right */
+            for (size_t j = 0U; j < bitnum - 1; ++j) {
+                div[j] = div[j + 1];
+            }
+
+            div[bitnum - 1] = manager.bddZero();
+        }
+        	
+        result = res;
+        remainder = rem.bvec_coerce(right.bitnum());
+        return 0;
+    }
+
     Bvec
     Bvec::bvec_ite(const BDD& val, const Bvec& left, const Bvec& right, bool precise) {
 	return bvec_ite_nodeLimit(val, left, right, precise, UINT_MAX);
@@ -497,6 +619,24 @@ namespace cudd {
 	for (size_t i = preciseBdds; i < left.bitnum(); ++i) {
 	    res.m_bitvec.push_back(manager.bddUnknown());
         }
+        return res;
+    }
+
+    Bvec
+    Bvec::bvec_ite_reduced(const BDD& val, const Bvec& left, const Bvec& right, traverse_heuristic heu, unsigned int nodeLimit) {
+        Cudd& manager = check_same_cudd(*left.m_manager, *right.m_manager);
+        Bvec res(manager);
+
+        if (left.bitnum() != right.bitnum()) {
+            return res;
+        }
+        reserve(res, left.bitnum());
+
+	if (nodeLimit != 0) {
+	    for (size_t i = 0U; i < left.bitnum(); ++i) {
+		res.m_bitvec.push_back(val.IteLim(left[i], right[i], heu, nodeLimit));
+	    }
+	}
         return res;
     }
 
@@ -553,6 +693,42 @@ namespace cudd {
     }
 
     Bvec
+    Bvec::bvec_shl_reduced(const Bvec& left, const Bvec& right, const BDD& con, traverse_heuristic heu, unsigned int nodeLimit) {
+        Cudd& manager = check_same_cudd(*left.m_manager, *right.m_manager);
+        Bvec res(manager);
+        if (left.bitnum() == 0 || right.bitnum() == 0) {
+
+            return res;
+        }
+
+        res = bvec_false(manager, left.bitnum());
+
+        for (size_t i = 0U; i <= left.bitnum(); ++i) {
+            Bvec val = bvec_con(manager, right.bitnum(), i);
+            BDD rEquN = bvec_equ_reduced(right, val, heu, nodeLimit);
+
+            for (size_t j = 0U; j < left.bitnum(); ++j) {
+                /* Set the m'th new location to be the (m+n)'th old location */
+                if (j >= i) {
+                    res[j] = res[j].OrLim(rEquN.AndLim(left[j - i], heu, nodeLimit), heu, nodeLimit);
+                } else {
+                    res[j] = res[j].OrLim(rEquN.AndLim(con, heu, nodeLimit), heu, nodeLimit);
+                }
+	    }
+        }
+
+        /* At last make sure 'c' is shifted in for r-values > l-bitnum */
+        Bvec val = bvec_con(manager, right.bitnum(), left.bitnum());
+        BDD rEquN = bvec_gth_reduced(right, val, heu, nodeLimit);
+
+        for (size_t i = 0U; i < left.bitnum(); i++) {
+            res[i] = res[i].OrLim(rEquN.AndLim(con, heu, nodeLimit), heu, nodeLimit);
+        }
+
+        return res;
+    }
+
+    Bvec
     Bvec::bvec_shrfixed(unsigned int pos, const BDD& con) const {
         if (pos < 0 || bitnum() == 0) {
             return Bvec(*m_manager);
@@ -602,9 +778,50 @@ namespace cudd {
         return res;
     }
 
+    Bvec
+    Bvec::bvec_shr_reduced(const Bvec& left, const Bvec& right, const BDD& con, traverse_heuristic heu, unsigned int nodeLimit) {
+        Cudd& manager = check_same_cudd(*left.m_manager, *right.m_manager);
+        Bvec res(manager);
+        if (left.bitnum() == 0 || right.bitnum() == 0) {
+            return res;
+        }
+
+        res = bvec_false(manager, left.bitnum());
+        BDD tmp1, rEquN;
+
+        for (size_t i = 0U; i <= left.bitnum(); ++i) {
+            Bvec val = bvec_con(manager, right.bitnum(), i);
+            rEquN = right == val;
+
+            for (size_t j = 0U; j < left.bitnum(); ++j) {
+                /* Set the m'th new location to be the (m+n)'th old location */
+                if (j + i < left.bitnum())
+                    tmp1 = rEquN.AndLim(left[j + i], heu, nodeLimit);
+                else
+                    tmp1 = rEquN.AndLim(con, heu, nodeLimit);
+                res[j] = res[j].OrLim(tmp1, heu, nodeLimit);
+            }
+        }
+
+        /* At last make sure 'c' is shifted in for r-values > l-bitnum */
+        Bvec val = bvec_con(manager, right.bitnum(), left.bitnum());
+        rEquN = bvec_gth_reduced(right, val, heu, nodeLimit);
+        tmp1 = rEquN.AndLim(con, heu, nodeLimit);
+
+        for (size_t i = 0U; i < left.bitnum(); ++i) {
+            res[i] = res[i].OrLim(tmp1, heu, nodeLimit);
+        }
+        return res;
+    }
+
     BDD
     Bvec::bvec_gth(const Bvec& left, const Bvec& right, bool precise) {
         return bvec_lth(right, left, precise);
+    }
+
+    BDD
+    Bvec::bvec_gth_reduced(const Bvec& left, const Bvec& right, traverse_heuristic heu, unsigned int nodeLimit) {
+        return bvec_lth_reduced(right, left, heu, nodeLimit);
     }
 
     BDD
@@ -613,13 +830,28 @@ namespace cudd {
     }
 
     BDD
+    Bvec::bvec_gte_reduced(const Bvec& left, const Bvec& right, traverse_heuristic heu, unsigned int nodeLimit) {
+        return bvec_lte_reduced(right, left, heu, nodeLimit);
+    }
+
+    BDD
     Bvec::bvec_sgth(const Bvec& left, const Bvec& right, bool precise) {
         return bvec_slte(right, left, precise);
     }
 
     BDD
+    Bvec::bvec_sgth_reduced(const Bvec& left, const Bvec& right, traverse_heuristic heu, unsigned int nodeLimit) {
+        return bvec_slte_reduced(right, left, heu, nodeLimit);
+    }
+
+    BDD
     Bvec::bvec_sgte(const Bvec& left, const Bvec& right, bool precise) {
         return bvec_slth(right, left, precise);
+    }
+
+    BDD
+    Bvec::bvec_sgte_reduced(const Bvec& left, const Bvec& right, traverse_heuristic heu, unsigned int nodeLimit) {
+        return bvec_slth_reduced(right, left, heu, nodeLimit);
     }
 
     Cudd&
